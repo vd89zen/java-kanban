@@ -1,7 +1,7 @@
 import java.util.HashMap;
 
 public class Epic extends Task {
-    private HashMap<Integer, Subtask> subtasks;
+    private final HashMap<Integer, Subtask> subtasks;
     private StatusProgress statusProgress;
 
     public Epic(String name, String description) {
@@ -92,8 +92,7 @@ public class Epic extends Task {
             descriptionLength = String.format("%d",getDescription().length());
         }
 
-        String result  = String.format("%nEpic{name='%s', description.length='%s', StatusProgress='%s', ID='%d', number of subtusks='%d'",
+        return String.format("%nEpic{name='%s', description.length='%s', StatusProgress='%s', ID='%d', number of subtusks='%d'",
                 getName(), descriptionLength, statusProgress.name(), getID(), subtasks.size());
-        return result;
     }
 }

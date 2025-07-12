@@ -98,9 +98,7 @@ public class TaskManager {
 
         if (epics.containsKey(epicID)) {
             ArrayList<Subtask> allSubtasks = new ArrayList<>();
-            for (Subtask subtask : epics.get(epicID).getAllSubtasks().values()) {
-                allSubtasks.add(subtask);
-            }
+            allSubtasks.addAll(epics.get(epicID).getAllSubtasks().values());
 
             return allSubtasks;
         } else {

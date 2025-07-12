@@ -1,5 +1,5 @@
 public class Subtask extends Task {
-    private int parentEpicID;
+    private final int parentEpicID;
 
     public Subtask(int parentEpicID, String name, String description, StatusProgress statusProgress) {
         super(name, description, statusProgress);
@@ -19,8 +19,7 @@ public class Subtask extends Task {
             descriptionLength = String.format("%d",getDescription().length());
         }
 
-        String result  = String.format("%nSubtask{name='%s', description.length='%s', StatusProgress='%s', ID='%d', parentEpicID='%d'",
+        return String.format("%nSubtask{name='%s', description.length='%s', StatusProgress='%s', ID='%d', parentEpicID='%d'",
                 getName(), descriptionLength, statusProgress.name(), getID(), parentEpicID);
-        return result;
     }
 }
