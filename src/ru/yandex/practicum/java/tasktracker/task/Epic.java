@@ -1,5 +1,10 @@
-import java.util.HashMap;
+package ru.yandex.practicum.java.tasktracker.task;
 
+import ru.yandex.practicum.java.tasktracker.manage.StatusProgress;
+import java.util.HashMap;
+import java.util.Objects;
+
+//добавил проверки для доступа вне менедржера
 public class Epic extends Task {
     private final HashMap<Integer, Subtask> subtasks;
     private StatusProgress statusProgress;
@@ -10,36 +15,46 @@ public class Epic extends Task {
         updateStatusProgress();
     }
 
-    protected void addSubtask(Subtask subtask) {
-        subtasks.put(subtask.getID(), subtask);
+    public void addSubtask(Subtask subtask) {
+        Objects.requireNonNull(subtask, "'subtask' can't be null");
+        subtasks.put(subtask.getIdNumber(), subtask);
         updateStatusProgress();
     }
 
     //метод идентичен addSubtask - но если надо будет изменить логику обновления, так будет проще
-    protected void updateSubtask(Subtask subtask) {
-        subtasks.put(subtask.getID(), subtask);
+    public void updateSubtask(Subtask subtask) {
+        Objects.requireNonNull(subtask, "'subtask' can't be null");
+        subtasks.put(subtask.getIdNumber(), subtask);
         updateStatusProgress();
     }
 
-    protected Subtask getSubtaskForID(Integer subtaskID) {
-        return subtasks.get(subtaskID);
+    public Subtask getSubtaskForIdNumber(Integer subtaskIdNumber) {
+        Objects.requireNonNull(subtaskIdNumber, "'subtaskIdNumber' can't be null");
+        return Objects.requireNonNull(subtasks.get(subtaskIdNumber), "subtask not finded");
     }
 
-    protected void removeSubtaskForID(Integer subtaskID) {
-        subtasks.remove(subtaskID);
+    public void removeSubtaskForIdNumber(Integer subtaskIdNumber) {
+        Objects.requireNonNull(subtaskIdNumber, "'subtaskIdNumber' can't be null");
+        subtasks.remove(subtaskIdNumber);
         updateStatusProgress();
     }
 
-    protected void removeAllSubtasks() {
+    public void removeAllSubtasks() {
         subtasks.clear();
         updateStatusProgress();
     }
 
-    protected HashMap<Integer, Subtask> getAllSubtasks() {
+    public HashMap<Integer, Subtask> getAllSubtasks() {
         return subtasks;
     }
 
     private void updateStatusProgress() {
+        //for buildObjectNull in TaskManager
+        if (getName() == "null") {
+            statusProgress = StatusProgress.NULL;
+            return;
+        }
+
         if (subtasks.isEmpty()) {
             statusProgress = StatusProgress.NEW;
             return;
@@ -92,7 +107,7 @@ public class Epic extends Task {
             descriptionLength = String.format("%d",getDescription().length());
         }
 
-        return String.format("%nEpic{name='%s', description.length='%s', StatusProgress='%s', ID='%d', number of subtusks='%d'",
-                getName(), descriptionLength, statusProgress.name(), getID(), subtasks.size());
+        return String.format("%nEpic{name='%s', description.length='%s', Status Progress='%s', ID number='%d', number of subtusks='%d'",
+                getName(), descriptionLength, statusProgress.name(), getIdNumber(), subtasks.size());
     }
 }

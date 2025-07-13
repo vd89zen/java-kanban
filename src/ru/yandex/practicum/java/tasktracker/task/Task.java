@@ -1,51 +1,56 @@
+package ru.yandex.practicum.java.tasktracker.task;
+
+import ru.yandex.practicum.java.tasktracker.manage.StatusProgress;
 import java.util.Objects;
 
 public class Task {
     private String name;
     private String description;
     public StatusProgress statusProgress;
-    private int ID;
+    private int idNumber;
 
     public Task(String name, String description) {
-        this.name = name;
-        this.description = description;
+        this.name = Objects.requireNonNull(name, "'name' can't be null");
+        this.description = Objects.requireNonNull(description, "'description' can't be null");
     }
 
     public Task(String name, String description, StatusProgress statusProgress) {
         this(name, description);
-        this.statusProgress = statusProgress;
+        this.statusProgress = Objects.requireNonNull(statusProgress, "'statusProgress' can't be null");
     }
 
     public String getName() {
         return name;
     }
 
-    public void setName(String newName) {
+    public boolean setName(String newName) {
         if (newName == null) {
-            return;
+            return false;
         }
 
         name = newName;
+        return true;
     }
 
     public String getDescription() {
         return description;
     }
 
-    public void setDescription(String newDescription) {
+    public boolean setDescription(String newDescription) {
         if (newDescription == null) {
-            return;
+            return false;
         }
 
         description = newDescription;
+        return true;
     }
 
-    protected void setID(int ID) {
-        this.ID = ID;
+    public void setIdNumber(int idNumber) {
+        this.idNumber = idNumber;
     }
 
-    public int getID() {
-        return ID;
+    public int getIdNumber() {
+        return idNumber;
     }
 
     public StatusProgress getStatusProgress() {
@@ -61,8 +66,8 @@ public class Task {
             descriptionLength = String.format("%d",description.length());
         }
 
-        return String.format("%nTask{name='%s', description.length='%s', StatusProgress='%s', ID='%d'",
-                name, descriptionLength, statusProgress.name(), ID);
+        return String.format("%nTask{name='%s', description.length='%s', Status Progress='%s', ID number='%d'",
+                name, descriptionLength, statusProgress.name(), idNumber);
     }
 
     @Override
@@ -74,7 +79,7 @@ public class Task {
 
         return Objects.equals(name, task.name)
                 && Objects.equals(description, task.description)
-                && Objects.equals(ID, task.ID)
+                && Objects.equals(idNumber, task.idNumber)
                 && Objects.equals(statusProgress, task.statusProgress);
     }
 
@@ -83,11 +88,8 @@ public class Task {
         int result = Objects.hashCode(name);
         result = 31 * result + Objects.hashCode(description);
         result = 31 * result + Objects.hashCode(statusProgress);
-        result = 31 * result + Objects.hashCode(ID);
+        result = 31 * result + Objects.hashCode(idNumber);
 
         return result;
     }
-
-
-
 }
