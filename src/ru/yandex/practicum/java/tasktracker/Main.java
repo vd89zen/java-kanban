@@ -1,3 +1,5 @@
+package ru.yandex.practicum.java.tasktracker;
+
 import ru.yandex.practicum.java.tasktracker.manage.StatusProgress;
 import ru.yandex.practicum.java.tasktracker.manage.TaskManager;
 import ru.yandex.practicum.java.tasktracker.task.Epic;
