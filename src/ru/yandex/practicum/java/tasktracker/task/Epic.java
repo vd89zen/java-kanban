@@ -50,7 +50,7 @@ public class Epic extends Task {
 
     private void updateStatusProgress() {
         //for buildObjectNull in TaskManager
-        if (getName() == "null") {
+        if (getName().equals("null")) {
             statusProgress = StatusProgress.NULL;
             return;
         }

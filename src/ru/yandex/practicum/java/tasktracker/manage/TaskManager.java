@@ -284,11 +284,11 @@ public class TaskManager {
     }
 
     private Object buildObjectNull(String objectType) {
-        if (objectType == "Task") {
+        if (objectType.equals("Task")) {
             Task taskNull = new Task("null", "null", StatusProgress.NULL);
             taskNull.setIdNumber(0);
             return taskNull;
-        } else if (objectType == "Epic") {
+        } else if (objectType.equals("Epic")) {
             Epic epicNull = new Epic("null", "null");
             epicNull.setIdNumber(0);
             return epicNull;
