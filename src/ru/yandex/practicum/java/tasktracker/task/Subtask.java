@@ -1,29 +1,72 @@
 package ru.yandex.practicum.java.tasktracker.task;
 
-import ru.yandex.practicum.java.tasktracker.manage.StatusProgress;
+import ru.yandex.practicum.java.tasktracker.manage.ResultOfOperation;
+import java.util.Objects;
 
-public class Subtask extends Task {
-    private int parentEpicIdNumber;
+public class Subtask extends AbstractTask {
+    private Integer parentEpicIdNumber;
 
-    public Subtask(int parentEpicIdNumber, String name, String description, StatusProgress statusProgress) {
-        super(name, description, statusProgress);
-        this.parentEpicIdNumber = parentEpicIdNumber;
+    public Subtask() {
+        super();
+        this.parentEpicIdNumber = null;
     }
 
-    public int getParentEpicIdNumber() {
+    public Subtask(Subtask subtask) {
+        super(subtask);
+        this.parentEpicIdNumber = subtask.parentEpicIdNumber;
+    }
+
+    public Subtask(Integer parentEpicIdNumber, String name, String description, StatusProgress statusProgress) {
+        super(name, description, statusProgress);
+        this.parentEpicIdNumber = Objects.requireNonNull(parentEpicIdNumber, "'parentEpicIdNumber' can't be null"); ;
+    }
+
+    public Subtask(Integer parentEpicIdNumber, String name, String description, StatusProgress statusProgress, Integer idNumber) {
+        super(name, description, statusProgress, idNumber);
+        this.parentEpicIdNumber = Objects.requireNonNull(parentEpicIdNumber, "'parentEpicIdNumber' can't be null"); ;
+    }
+
+    public ResultOfOperation setStatusProgress(StatusProgress statusProgress) {
+        if (statusProgress == null) {
+            return ResultOfOperation.ERROR_OBJECT_NULL;
+        }
+
+        this.statusProgress = statusProgress;
+        return ResultOfOperation.SUCCESS;
+    }
+
+    public ResultOfOperation setParentEpicIdNumber(Integer parentEpicIdNumber) {
+        if (parentEpicIdNumber == null) {
+            return ResultOfOperation.ERROR_OBJECT_NULL;
+        } else if (parentEpicIdNumber < 0) {
+            return ResultOfOperation.ERROR_ID_LESS_ZERO;
+        }
+
+        this.parentEpicIdNumber = parentEpicIdNumber;
+        return ResultOfOperation.SUCCESS;
+    }
+
+    public Integer getParentEpicIdNumber() {
         return parentEpicIdNumber;
     }
 
     @Override
     public String toString() {
         String descriptionLength;
-        if (getDescription() == null) {
+        if (description == null) {
             descriptionLength = "null";
         } else {
-            descriptionLength = String.format("%d",getDescription().length());
+            descriptionLength = String.format("%d", description.length());
+        }
+
+        String statusProgressName;
+        if (statusProgress == null) {
+            statusProgressName = "null";
+        } else {
+            statusProgressName = statusProgress.name();
         }
 
         return String.format("%nSubtask{name='%s', description.length='%s', Status Progress='%s', ID number='%d', PARENT_EPIC_ID number='%d'",
-                getName(), descriptionLength, statusProgress.name(), getIdNumber(), parentEpicIdNumber);
+                name, descriptionLength, statusProgressName, idNumber, parentEpicIdNumber);
     }
 }

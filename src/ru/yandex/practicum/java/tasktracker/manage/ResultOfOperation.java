@@ -1,0 +1,13 @@
+package ru.yandex.practicum.java.tasktracker.manage;
+
+public enum ResultOfOperation {
+    SUCCESS,
+    ERROR_OBJECT_NULL,
+    ERROR_OBJECT_FIELDS_NULL,
+    ERROR_ID_LESS_ZERO,
+    ERROR_MISMATCH_PARENT_ID,
+    ERROR_OBJECT_NOT_FOUND,
+    ERROR_SUBTASK_NOT_FOUND,
+    ERROR_OBJECT_ALREADY_EXISTS,
+    ERROR_NO_AVAILABLE_ID
+}

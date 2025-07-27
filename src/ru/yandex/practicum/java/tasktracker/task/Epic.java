@@ -1,60 +1,83 @@
 package ru.yandex.practicum.java.tasktracker.task;
 
-import ru.yandex.practicum.java.tasktracker.manage.StatusProgress;
+import ru.yandex.practicum.java.tasktracker.manage.ResultOfOperation;
+import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Objects;
 
-//добавил проверки для доступа вне менедржера
-public class Epic extends Task {
-    private final HashMap<Integer, Subtask> subtasks;
-    private StatusProgress statusProgress;
+public class Epic extends AbstractTask {
+    private final HashMap<Integer, StatusProgress> subtasks;
+
+    public Epic() {
+        super();
+        subtasks = null;
+    }
+
+    public Epic(Epic epic) {
+        super(epic);
+        subtasks = epic.subtasks;
+    }
 
     public Epic(String name, String description) {
-        super(name, description);
+        super(name, description, StatusProgress.NEW);
         subtasks = new HashMap<>();
-        updateStatusProgress();
     }
 
-    public void addSubtask(Subtask subtask) {
-        Objects.requireNonNull(subtask, "'subtask' can't be null");
-        subtasks.put(subtask.getIdNumber(), subtask);
-        updateStatusProgress();
+    public Epic(String name, String description, Integer idNumber) {
+        super(name, description, StatusProgress.NEW, idNumber);
+        subtasks = new HashMap<>();
     }
 
-    //метод идентичен addSubtask - но если надо будет изменить логику обновления, так будет проще
-    public void updateSubtask(Subtask subtask) {
-        Objects.requireNonNull(subtask, "'subtask' can't be null");
-        subtasks.put(subtask.getIdNumber(), subtask);
-        updateStatusProgress();
+    public ResultOfOperation addSubtask(Integer subtaskIdNumber, StatusProgress subtaskStatusProgress) {
+        if (subtaskIdNumber == null || subtaskStatusProgress == null) {
+            return ResultOfOperation.ERROR_OBJECT_NULL;
+        }
+
+        if (subtasks.containsKey(subtaskIdNumber) == false) {
+            subtasks.put(subtaskIdNumber, subtaskStatusProgress);
+            updateStatusProgress();
+            return ResultOfOperation.SUCCESS;
+        } else {
+            return ResultOfOperation.ERROR_OBJECT_ALREADY_EXISTS;
+        }
     }
 
-    public Subtask getSubtaskForIdNumber(Integer subtaskIdNumber) {
-        Objects.requireNonNull(subtaskIdNumber, "'subtaskIdNumber' can't be null");
-        return Objects.requireNonNull(subtasks.get(subtaskIdNumber), "subtask not finded");
+    public ResultOfOperation removeSubtask(Integer subtaskIdNumber) {
+        if (subtaskIdNumber == null) {
+            return ResultOfOperation.ERROR_OBJECT_NULL;
+        }
+
+        if (subtasks.containsKey(subtaskIdNumber)) {
+            subtasks.remove(subtaskIdNumber);
+            updateStatusProgress();
+            return ResultOfOperation.SUCCESS;
+        } else {
+            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
+        }
     }
 
-    public void removeSubtaskForIdNumber(Integer subtaskIdNumber) {
-        Objects.requireNonNull(subtaskIdNumber, "'subtaskIdNumber' can't be null");
-        subtasks.remove(subtaskIdNumber);
-        updateStatusProgress();
+    public ArrayList<Integer> getAllSubtasksIdNumber() {
+        return new ArrayList<>(subtasks.keySet());
     }
 
-    public void removeAllSubtasks() {
+    public void removeAllSubtasksIdNumber() {
         subtasks.clear();
         updateStatusProgress();
     }
 
-    public HashMap<Integer, Subtask> getAllSubtasks() {
-        return subtasks;
+    public ResultOfOperation updateSubtask(Integer subtaskIdNumber, StatusProgress subtaskStatusProgress) {
+        if (subtaskIdNumber == null || subtaskStatusProgress == null) {
+            return ResultOfOperation.ERROR_OBJECT_NULL;
+        }
+
+        if (subtasks.replace(subtaskIdNumber, subtaskStatusProgress) == null) {
+            return ResultOfOperation.ERROR_SUBTASK_NOT_FOUND;
+        } else {
+            updateStatusProgress();
+            return ResultOfOperation.SUCCESS;
+        }
     }
 
     private void updateStatusProgress() {
-        //for buildObjectNull in TaskManager
-        if (getName().equals("null")) {
-            statusProgress = StatusProgress.NULL;
-            return;
-        }
-
         if (subtasks.isEmpty()) {
             statusProgress = StatusProgress.NEW;
             return;
@@ -63,22 +86,21 @@ public class Epic extends Task {
         boolean epicDONE = true;
         boolean epicNEW = true;
 
-        for (Subtask subtask : subtasks.values()) {
-            StatusProgress statusSubtask = subtask.statusProgress;
+        for (StatusProgress subtaskStatusProgress : subtasks.values()) {
             if (epicDONE) {
-                if (statusSubtask == StatusProgress.IN_PROGRESS) {
+                if (subtaskStatusProgress == StatusProgress.IN_PROGRESS) {
                     statusProgress = StatusProgress.IN_PROGRESS;
                     return;
-                } else if (statusSubtask == StatusProgress.NEW) {
+                } else if (subtaskStatusProgress == StatusProgress.NEW) {
                     epicDONE = false;
                 }
             }
 
             if (epicNEW) {
-                if (statusSubtask == StatusProgress.IN_PROGRESS) {
+                if (subtaskStatusProgress == StatusProgress.IN_PROGRESS) {
                     statusProgress = StatusProgress.IN_PROGRESS;
                     return;
-                } else if (statusSubtask == StatusProgress.DONE) {
+                } else if (subtaskStatusProgress == StatusProgress.DONE) {
                     epicNEW = false;
                 }
             }
@@ -94,20 +116,29 @@ public class Epic extends Task {
     }
 
     @Override
-    public StatusProgress getStatusProgress() {
-        return statusProgress;
-    }
-
-    @Override
     public String toString() {
         String descriptionLength;
-        if (getDescription() == null) {
+        if (description == null) {
             descriptionLength = "null";
         } else {
-            descriptionLength = String.format("%d",getDescription().length());
+            descriptionLength = String.format("%d", description.length());
         }
 
-        return String.format("%nEpic{name='%s', description.length='%s', Status Progress='%s', ID number='%d', number of subtusks='%d'",
-                getName(), descriptionLength, statusProgress.name(), getIdNumber(), subtasks.size());
+        String statusProgressName;
+        if (statusProgress == null) {
+            statusProgressName = "null";
+        } else {
+            statusProgressName = statusProgress.name();
+        }
+
+        String subtasksSize;
+        if (subtasks == null) {
+            subtasksSize = "null";
+        } else {
+            subtasksSize = String.format("%d", subtasks.size());
+        }
+
+        return String.format("%nEpic{name='%s', description.length='%s', Status Progress='%s', ID number='%d', number of subtusks='%s'",
+                name, descriptionLength, statusProgressName, idNumber, subtasksSize);
     }
 }
