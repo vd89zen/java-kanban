@@ -18,12 +18,12 @@ public class Subtask extends AbstractTask {
 
     public Subtask(Integer parentEpicIdNumber, String name, String description, StatusProgress statusProgress) {
         super(name, description, statusProgress);
-        this.parentEpicIdNumber = Objects.requireNonNull(parentEpicIdNumber, "'parentEpicIdNumber' can't be null"); ;
+        this.parentEpicIdNumber = Objects.requireNonNull(parentEpicIdNumber, "'parentEpicIdNumber' can't be null");
     }
 
     public Subtask(Integer parentEpicIdNumber, String name, String description, StatusProgress statusProgress, Integer idNumber) {
         super(name, description, statusProgress, idNumber);
-        this.parentEpicIdNumber = Objects.requireNonNull(parentEpicIdNumber, "'parentEpicIdNumber' can't be null"); ;
+        this.parentEpicIdNumber = Objects.requireNonNull(parentEpicIdNumber, "'parentEpicIdNumber' can't be null");
     }
 
     public ResultOfOperation setStatusProgress(StatusProgress statusProgress) {

@@ -56,6 +56,10 @@ public class Epic extends AbstractTask {
     }
 
     public ArrayList<Integer> getAllSubtasksIdNumber() {
+        if (subtasks.isEmpty()) {
+            return new ArrayList<>();
+        }
+
         return new ArrayList<>(subtasks.keySet());
     }
 
