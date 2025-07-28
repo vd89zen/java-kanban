@@ -14,11 +14,6 @@ public class InMemoryTaskManager implements TaskManager {
     private final List<Integer> allIdInMemory;
     private final HashMap<Integer, Task> tasks;
     private final HashMap<Integer, Epic> epics;
-    /*
-     * "private final HashMap<Integer, Subtask> subtasks" привёл к единообразию с тасками и эпиками
-     * (было: (ключ)ID подзадачи-(значение)ID её родителя), в том числе исходя из логики что главный по манипулияциям менеджер, и
-     * за апдейты тоже он отвечает; + в эпике теперь только айди и статусы сабтасков, а не сами таски хранятся.
-     */
     private final HashMap<Integer, Subtask> subtasks;
     private final HistoryManager historyManager;
 
