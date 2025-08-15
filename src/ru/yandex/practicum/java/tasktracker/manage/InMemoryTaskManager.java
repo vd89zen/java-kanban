@@ -247,7 +247,7 @@ public class InMemoryTaskManager implements TaskManager {
             epicForWork = new Epic(epic);
             if (epicForWork.getAllSubtasksIdNumber().isEmpty() == false) {
                 for (Integer subtaskIdNumber : epicForWork.getAllSubtasksIdNumber()) {
-                    if (subtasks.containsKey(subtaskIdNumber) == false) {//т.е.подзадача в эпик добавляется через Менеджера, иначе ошибка.
+                    if (subtasks.containsKey(subtaskIdNumber) == false) { //т.е.подзадача в эпик добавляется через Менеджера, иначе ошибка.
                         return ResultOfOperation.ERROR_SUBTASK_NOT_FOUND;
                     }
                 }
@@ -349,8 +349,8 @@ public class InMemoryTaskManager implements TaskManager {
                 }
             }
             epicForWork = epics.get(subtaskForWork.getParentEpicIdNumber());
-            ResultOfOperation resultOfOperation = epicForWork.addSubtask(subtaskForWork.getIdNumber()
-                    , subtaskForWork.getStatusProgress());
+            ResultOfOperation resultOfOperation = epicForWork.addSubtask(subtaskForWork.getIdNumber(),
+                    subtaskForWork.getStatusProgress());
             if (resultOfOperation == ResultOfOperation.SUCCESS) {
                 subtasks.put(subtaskForWork.getIdNumber(), subtaskForWork);
                 allIdInMemory.add(subtaskForWork.getIdNumber());
