@@ -5,7 +5,6 @@ import ru.yandex.practicum.java.tasktracker.task.Epic;
 import ru.yandex.practicum.java.tasktracker.task.Subtask;
 import ru.yandex.practicum.java.tasktracker.task.Task;
 import java.util.ArrayList;
-import java.util.HashMap;
 
 public interface TaskManager {
     ArrayList<AbstractTask> getHistory();
