@@ -19,7 +19,7 @@ public class LinkedHashMapCustom {
         NodeCustom previousNode; //
         NodeCustom nextNode;
 
-        NodeCustom (AbstractTask task, NodeCustom previous, NodeCustom next) {
+        NodeCustom(AbstractTask task, NodeCustom previous, NodeCustom next) {
             this.task = task;
             previousNode = previous;
             nextNode = next;
