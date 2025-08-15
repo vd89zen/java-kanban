@@ -1,12 +1,12 @@
 package ru.yandex.practicum.java.tasktracker.manage;
 
 import ru.yandex.practicum.java.tasktracker.task.AbstractTask;
-import java.util.LinkedList;
+import java.util.ArrayList;
 
 public interface HistoryManager {
-    byte MAX_SIZE_HISTORY = 10;
 
     ResultOfOperation addRecord(AbstractTask task);
+    ResultOfOperation removeRecord(Integer idNumber);
 
-    LinkedList<AbstractTask> getHistory();
+    ArrayList<AbstractTask> getHistory();
 }

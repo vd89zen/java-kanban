@@ -3,6 +3,7 @@ package ru.yandex.practicum.java.tasktracker.task;
 import ru.yandex.practicum.java.tasktracker.manage.ResultOfOperation;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Objects;
 
 public class Epic extends AbstractTask {
     private final HashMap<Integer, StatusProgress> subtasks;
@@ -144,5 +145,30 @@ public class Epic extends AbstractTask {
 
         return String.format("%nEpic{name='%s', description.length='%s', Status Progress='%s', ID number='%d', number of subtusks='%s'",
                 name, descriptionLength, statusProgressName, idNumber, subtasksSize);
+    }
+
+    @Override
+    public boolean equals(Object object) {
+        if (this == object) return true;
+        if (object == null || getClass() != object.getClass()) return false;
+
+        Epic epic = (Epic) object;
+
+        return idNumber == epic.idNumber
+                && Objects.equals(name, epic.name)
+                && Objects.equals(description, epic.description)
+                && Objects.equals(statusProgress, epic.statusProgress)
+                && Objects.equals(subtasks, epic.subtasks);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hashCode(idNumber);
+        result = 31 * result + Objects.hashCode(name);
+        result = 31 * result + Objects.hashCode(description);
+        result = 31 * result + Objects.hashCode(statusProgress);
+        result = 31 * result + Objects.hashCode(subtasks);
+
+        return result;
     }
 }

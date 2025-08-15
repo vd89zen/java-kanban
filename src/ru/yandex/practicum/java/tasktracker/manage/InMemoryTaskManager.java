@@ -1,17 +1,18 @@
 package ru.yandex.practicum.java.tasktracker.manage;
 
 import ru.yandex.practicum.java.tasktracker.task.*;
-
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.HashSet;
 
 public class InMemoryTaskManager implements TaskManager {
-    public static Integer counterForIdNumber;
-    private static boolean isRestarted;
-    private static Epic epicForWork;
-    private final List<Integer> allIdInMemory;
+    private Integer counterForIdNumber;
+    private boolean isRestarted;
+    private Epic epicForWork;
+    private Task taskForWork;
+    private Subtask subtaskForWork;
+
+    private final HashSet<Integer> allIdInMemory;
     private final HashMap<Integer, Task> tasks;
     private final HashMap<Integer, Epic> epics;
     private final HashMap<Integer, Subtask> subtasks;
@@ -23,7 +24,7 @@ public class InMemoryTaskManager implements TaskManager {
         subtasks = new HashMap<>();
         historyManager = ManagersUtil.getDefaultHistory();
         counterForIdNumber = 1;
-        allIdInMemory = new ArrayList<>();
+        allIdInMemory = new HashSet<>();
         isRestarted = false;
     }
 
@@ -44,7 +45,12 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     @Override
-    public LinkedList<AbstractTask> getHistory() {
+    public int getTotalOfIdNumber() {
+        return allIdInMemory.size();
+    }
+
+    @Override
+    public ArrayList<AbstractTask> getHistory() {
         return historyManager.getHistory();
     }
 
@@ -62,16 +68,20 @@ public class InMemoryTaskManager implements TaskManager {
             return ResultOfOperation.ERROR_OBJECT_ALREADY_EXISTS;
         }
 
-        if (task.getIdNumber() == 0) {
+        taskForWork = new Task(task);
+
+        if (taskForWork.getIdNumber() == 0) {
             if (generateIdNumber() == ResultOfOperation.SUCCESS) {
+                taskForWork.setIdNumber(counterForIdNumber);
                 task.setIdNumber(counterForIdNumber);
             } else {
                 return ResultOfOperation.ERROR_NO_AVAILABLE_ID;
             }
         }
 
-        tasks.put(task.getIdNumber(), task);
-        allIdInMemory.add(task.getIdNumber());
+        tasks.put(taskForWork.getIdNumber(), taskForWork);
+        allIdInMemory.add(taskForWork.getIdNumber());
+        taskForWork = null;
         return ResultOfOperation.SUCCESS;
     }
 
@@ -81,7 +91,11 @@ public class InMemoryTaskManager implements TaskManager {
             return new ArrayList<>();
         }
 
-        return new ArrayList<>(tasks.values());
+        ArrayList<Task> tasksForReturn = new ArrayList<>();
+        for (Task task : tasks.values()) {
+            tasksForReturn.add(new Task(task));
+        }
+        return tasksForReturn;
     }
 
     @Override
@@ -90,8 +104,13 @@ public class InMemoryTaskManager implements TaskManager {
             return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
         }
 
+        for (Integer idNumber : tasks.keySet()) {
+            historyManager.removeRecord(idNumber);
+        }
+
         allIdInMemory.removeAll(tasks.keySet());
         tasks.clear();
+
         return ResultOfOperation.SUCCESS;
     }
 
@@ -102,8 +121,8 @@ public class InMemoryTaskManager implements TaskManager {
         }
 
         if (tasks.containsKey(taskIdNumber)) {
-            historyManager.addRecord(new Task(tasks.get(taskIdNumber)));//на вход сразу передаём копию
-            return tasks.get(taskIdNumber);
+            historyManager.addRecord(tasks.get(taskIdNumber));//т.к. дубли уже не нужны, просто передаём оригинал
+            return new Task(tasks.get(taskIdNumber));
         }
         return new Task();
     }
@@ -120,7 +139,9 @@ public class InMemoryTaskManager implements TaskManager {
         }
 
         if (tasks.containsKey(task.getIdNumber())) {
-            tasks.put(task.getIdNumber(), task);
+            taskForWork = new Task(task);
+            tasks.put(taskForWork.getIdNumber(), taskForWork);
+            taskForWork = null;
             return ResultOfOperation.SUCCESS;
         }
         return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
@@ -136,6 +157,7 @@ public class InMemoryTaskManager implements TaskManager {
 
         if (tasks.containsKey(taskIdNumber)) {
             tasks.remove(taskIdNumber);
+            historyManager.removeRecord(taskIdNumber);
             allIdInMemory.remove(taskIdNumber);
             return ResultOfOperation.SUCCESS;
         }
@@ -156,24 +178,28 @@ public class InMemoryTaskManager implements TaskManager {
             return ResultOfOperation.ERROR_OBJECT_ALREADY_EXISTS;
         }
 
-        if (epic.getIdNumber() == 0) {
+        epicForWork = new Epic(epic);
+
+        if (epicForWork.getIdNumber() == 0) {
             if (generateIdNumber() == ResultOfOperation.SUCCESS) {
+                epicForWork.setIdNumber(counterForIdNumber);
                 epic.setIdNumber(counterForIdNumber);
             } else {
                 return ResultOfOperation.ERROR_NO_AVAILABLE_ID;
             }
         }
 
-        if (epic.getAllSubtasksIdNumber().isEmpty() == false) {
-            for (Integer subtaskIdNumber : epic.getAllSubtasksIdNumber()) {
+        if (epicForWork.getAllSubtasksIdNumber().isEmpty() == false) {
+            for (Integer subtaskIdNumber : epicForWork.getAllSubtasksIdNumber()) {
                 if (subtasks.containsKey(subtaskIdNumber) == false) {
                     return ResultOfOperation.ERROR_SUBTASK_NOT_FOUND;
                 }
             }
         }
 
-        epics.put(epic.getIdNumber(), epic);
-        allIdInMemory.add(epic.getIdNumber());
+        epics.put(epicForWork.getIdNumber(), epicForWork);
+        allIdInMemory.add(epicForWork.getIdNumber());
+        epicForWork = null;
         return ResultOfOperation.SUCCESS;
     }
 
@@ -183,7 +209,11 @@ public class InMemoryTaskManager implements TaskManager {
             return new ArrayList<>();
         }
 
-        return new ArrayList<>(epics.values());
+        ArrayList<Epic> epicsForReturn = new ArrayList<>();
+        for (Epic epic : epics.values()) {
+            epicsForReturn.add(new Epic(epic));
+        }
+        return epicsForReturn;
     }
 
     @Override
@@ -195,7 +225,7 @@ public class InMemoryTaskManager implements TaskManager {
         if (epics.containsKey(epicIdNumber)) {
             ArrayList<Subtask> allSubtasks = new ArrayList<>();
             for (Integer subtaskIdNumber : epics.get(epicIdNumber).getAllSubtasksIdNumber()) {
-                allSubtasks.add(subtasks.get(subtaskIdNumber));
+                allSubtasks.add(new Subtask(subtasks.get(subtaskIdNumber)));
             }
             return allSubtasks;
         }
@@ -214,14 +244,16 @@ public class InMemoryTaskManager implements TaskManager {
         }
 
         if (epics.containsKey(epic.getIdNumber())) {
-            if (epic.getAllSubtasksIdNumber().isEmpty() == false) {
-                for (Integer subtaskIdNumber : epic.getAllSubtasksIdNumber()) {
-                    if (subtasks.containsKey(subtaskIdNumber) == false) {
+            epicForWork = new Epic(epic);
+            if (epicForWork.getAllSubtasksIdNumber().isEmpty() == false) {
+                for (Integer subtaskIdNumber : epicForWork.getAllSubtasksIdNumber()) {
+                    if (subtasks.containsKey(subtaskIdNumber) == false) {//т.е.подзадача в эпик добавляется через Менеджера, иначе ошибка.
                         return ResultOfOperation.ERROR_SUBTASK_NOT_FOUND;
                     }
                 }
             }
-            epics.put(epic.getIdNumber(), epic);
+            epics.put(epicForWork.getIdNumber(), epicForWork);
+            epicForWork = null;
             return ResultOfOperation.SUCCESS;
         }
         return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
@@ -231,11 +263,18 @@ public class InMemoryTaskManager implements TaskManager {
     public ResultOfOperation removeAllEpics() {
         if (subtasks.isEmpty() == false) {
             allIdInMemory.removeAll(subtasks.keySet());
+            for (Integer idNumber : subtasks.keySet()) {
+                historyManager.removeRecord(idNumber);
+            }
             subtasks.clear();
         }
 
         if (epics.isEmpty()) {
             return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
+        }
+
+        for (Integer idNumber : epics.keySet()) {
+            historyManager.removeRecord(idNumber);
         }
 
         allIdInMemory.removeAll(epics.keySet());
@@ -250,8 +289,8 @@ public class InMemoryTaskManager implements TaskManager {
         }
 
         if (epics.containsKey(epicIdNumber)) {
-            historyManager.addRecord(new Epic(epics.get(epicIdNumber)));
-            return epics.get(epicIdNumber);
+            historyManager.addRecord(epics.get(epicIdNumber));
+            return new Epic(epics.get(epicIdNumber));
         }
         return new Epic();
     }
@@ -269,13 +308,16 @@ public class InMemoryTaskManager implements TaskManager {
                 for (Integer subtaskIdNumber : epics.get(epicIdNumber).getAllSubtasksIdNumber()) {
                     subtasks.remove(subtaskIdNumber);
                     allIdInMemory.remove(subtaskIdNumber);
+                    historyManager.removeRecord(subtaskIdNumber);
                 }
             }
 
             epics.remove(epicIdNumber);
             allIdInMemory.remove(epicIdNumber);
+            historyManager.removeRecord(epicIdNumber);
             return ResultOfOperation.SUCCESS;
         }
+
         return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
     }
 
@@ -295,19 +337,24 @@ public class InMemoryTaskManager implements TaskManager {
             return ResultOfOperation.ERROR_OBJECT_ALREADY_EXISTS;
         }
 
-        if (epics.containsKey(subtask.getParentEpicIdNumber())) {
-            if (subtask.getIdNumber() == 0) {
+        subtaskForWork = new Subtask(subtask);
+
+        if (epics.containsKey(subtaskForWork.getParentEpicIdNumber())) {
+            if (subtaskForWork.getIdNumber() == 0) {
                 if (generateIdNumber() == ResultOfOperation.SUCCESS) {
+                    subtaskForWork.setIdNumber(counterForIdNumber);
                     subtask.setIdNumber(counterForIdNumber);
                 } else {
                     return ResultOfOperation.ERROR_NO_AVAILABLE_ID;
                 }
             }
-            epicForWork = epics.get(subtask.getParentEpicIdNumber());
-            ResultOfOperation resultOfOperation = epicForWork.addSubtask(subtask.getIdNumber(), subtask.getStatusProgress());
+            epicForWork = epics.get(subtaskForWork.getParentEpicIdNumber());
+            ResultOfOperation resultOfOperation = epicForWork.addSubtask(subtaskForWork.getIdNumber()
+                    , subtaskForWork.getStatusProgress());
             if (resultOfOperation == ResultOfOperation.SUCCESS) {
-                subtasks.put(subtask.getIdNumber(), subtask);
-                allIdInMemory.add(subtask.getIdNumber());
+                subtasks.put(subtaskForWork.getIdNumber(), subtaskForWork);
+                allIdInMemory.add(subtaskForWork.getIdNumber());
+                subtaskForWork = null;
                 return ResultOfOperation.SUCCESS;
             } else {
                 return resultOfOperation;
@@ -322,7 +369,11 @@ public class InMemoryTaskManager implements TaskManager {
             return new ArrayList<>();
         }
 
-        return new ArrayList<>(subtasks.values());
+        ArrayList<Subtask> subtasksForReturn = new ArrayList<>();
+        for (Subtask subtask : subtasks.values()) {
+            subtasksForReturn.add(new Subtask(subtask));
+        }
+        return subtasksForReturn;
     }
 
     @Override
@@ -333,6 +384,10 @@ public class InMemoryTaskManager implements TaskManager {
 
         for (Epic epic : epics.values()) {
             epic.removeAllSubtasksIdNumber();
+        }
+
+        for (Integer idNumber : subtasks.keySet()) {
+            historyManager.removeRecord(idNumber);
         }
 
         allIdInMemory.removeAll(subtasks.keySet());
@@ -347,8 +402,8 @@ public class InMemoryTaskManager implements TaskManager {
         }
 
         if (subtasks.containsKey(subtaskIdNumber)) {
-            historyManager.addRecord(new Subtask(subtasks.get(subtaskIdNumber)));
-            return subtasks.get(subtaskIdNumber);
+            historyManager.addRecord(subtasks.get(subtaskIdNumber));
+            return new Subtask(subtasks.get(subtaskIdNumber));
         }
         return new Subtask();
     }
@@ -364,10 +419,10 @@ public class InMemoryTaskManager implements TaskManager {
         if (subtasks.containsKey(subtaskIdNumber)) {
             Integer parentEpicIdNumber = subtasks.get(subtaskIdNumber).getParentEpicIdNumber();
             subtasks.remove(subtaskIdNumber);
+            historyManager.removeRecord(subtaskIdNumber);
             allIdInMemory.remove(subtaskIdNumber);
             if (epics.containsKey(parentEpicIdNumber)) {
-                epicForWork = epics.get(parentEpicIdNumber);
-                return epicForWork.removeSubtask(subtaskIdNumber);
+                return epics.get(parentEpicIdNumber).removeSubtask(subtaskIdNumber);
             }
         }
         return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
@@ -387,12 +442,14 @@ public class InMemoryTaskManager implements TaskManager {
         }
 
         if (subtasks.containsKey(subtask.getIdNumber())) {
-            Integer parentEpicIdNumber = subtask.getParentEpicIdNumber();
+            subtaskForWork = subtask;
+            Integer parentEpicIdNumber = subtaskForWork.getParentEpicIdNumber();
             if (epics.containsKey(parentEpicIdNumber)) {
                 epicForWork = epics.get(parentEpicIdNumber);
-                if (epicForWork.updateSubtask(subtask.getIdNumber(), subtask.getStatusProgress())
+                if (epicForWork.updateSubtask(subtaskForWork.getIdNumber(), subtaskForWork.getStatusProgress())
                         == ResultOfOperation.SUCCESS) {
-                    subtasks.put(subtask.getIdNumber(), subtask);
+                    subtasks.put(subtaskForWork.getIdNumber(), subtaskForWork);
+                    subtaskForWork = null;
                     return ResultOfOperation.SUCCESS;
                 }
             }

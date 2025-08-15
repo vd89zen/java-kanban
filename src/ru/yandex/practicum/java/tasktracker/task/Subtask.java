@@ -69,4 +69,29 @@ public class Subtask extends AbstractTask {
         return String.format("%nSubtask{name='%s', description.length='%s', Status Progress='%s', ID number='%d', PARENT_EPIC_ID number='%d'",
                 name, descriptionLength, statusProgressName, idNumber, parentEpicIdNumber);
     }
+
+    @Override
+    public boolean equals(Object object) {
+        if (this == object) return true;
+        if (object == null || getClass() != object.getClass()) return false;
+
+        Subtask subtask = (Subtask) object;
+
+        return idNumber == subtask.idNumber
+                && parentEpicIdNumber == subtask.parentEpicIdNumber
+                && Objects.equals(name, subtask.name)
+                && Objects.equals(description, subtask.description)
+                && Objects.equals(statusProgress, subtask.statusProgress);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hashCode(idNumber);
+        result = 31 * result + Objects.hashCode(parentEpicIdNumber);
+        result = 31 * result + Objects.hashCode(name);
+        result = 31 * result + Objects.hashCode(description);
+        result = 31 * result + Objects.hashCode(statusProgress);
+
+        return result;
+    }
 }
