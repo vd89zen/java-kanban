@@ -1,6 +1,6 @@
 package ru.yandex.practicum.java.tasktracker.manage;
 
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import ru.yandex.practicum.java.tasktracker.task.StatusProgress;
@@ -17,8 +17,8 @@ class InMemoryHistoryManagerTest {
     private static final String BASE_TASK_1_NAME = "baseTask1";
     private static final Integer BASE_TASK_1_ID = 1;
 
-    @BeforeAll
-    public static void Prepare_For_Test() {
+    @BeforeEach
+    public void Prepare_For_Test() {
         inMemoryHistoryManager = new InMemoryHistoryManager();
         baseTask1 = new Task(BASE_TASK_1_NAME, DESCRIPTION, StatusProgress.NEW, BASE_TASK_1_ID);
     }
@@ -30,6 +30,18 @@ class InMemoryHistoryManagerTest {
         expectedResult = ResultOfOperation.SUCCESS;
         //When
         actualResult = inMemoryHistoryManager.addRecord(baseTask1);
+        //Then
+        assertEquals(expectedResult, actualResult);
+    }
+
+    @Test
+    @DisplayName("Проверяем удаление записи из истории")
+    void removeRecord_Test() {
+        //Given
+        inMemoryHistoryManager.addRecord(baseTask1);
+        expectedResult = ResultOfOperation.SUCCESS;
+        //When
+        actualResult = inMemoryHistoryManager.removeRecord(BASE_TASK_1_ID);
         //Then
         assertEquals(expectedResult, actualResult);
     }

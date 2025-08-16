@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ManagersUtilTest {
 
     @Test
-    @DisplayName("Получаем экземпляр класса InMemoryTaskManager")
+    @DisplayName("Проверяем готовность экземпляра класса InMemoryTaskManager")
     void getDefault_Test() {
         //Given
         boolean isInMemoryTaskManager = false;
@@ -19,7 +19,7 @@ class ManagersUtilTest {
     }
 
     @Test
-    @DisplayName("Получаем экземпляр класса InMemoryHistoryManager")
+    @DisplayName("Проверяем готовность экземпляра класса InMemoryHistoryManager")
     void getDefaultHistory_Test() {
         //Given
         boolean isInMemoryHistoryManager = false;

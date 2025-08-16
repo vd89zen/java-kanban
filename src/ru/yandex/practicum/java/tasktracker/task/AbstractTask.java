@@ -88,27 +88,4 @@ public abstract class AbstractTask {
         return statusProgress;
     }
 
-    @Override
-    public boolean equals(Object object) {
-        if (this == object) return true;
-        if (object == null || getClass() != object.getClass()) return false;
-
-        AbstractTask task = (AbstractTask) object;
-
-        return Objects.equals(name, task.name)
-                && Objects.equals(description, task.description)
-                && Objects.equals(idNumber, task.idNumber)
-                && Objects.equals(statusProgress, task.statusProgress);
-    }
-
-    @Override
-    public int hashCode() {
-        int result = Objects.hashCode(name);
-        result = 31 * result + Objects.hashCode(description);
-        result = 31 * result + Objects.hashCode(statusProgress);
-        result = 31 * result + Objects.hashCode(idNumber);
-
-        return result;
-    }
-
 }

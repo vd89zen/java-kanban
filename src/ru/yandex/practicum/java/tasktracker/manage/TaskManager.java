@@ -4,12 +4,12 @@ import ru.yandex.practicum.java.tasktracker.task.AbstractTask;
 import ru.yandex.practicum.java.tasktracker.task.Epic;
 import ru.yandex.practicum.java.tasktracker.task.Subtask;
 import ru.yandex.practicum.java.tasktracker.task.Task;
-
 import java.util.ArrayList;
-import java.util.LinkedList;
 
 public interface TaskManager {
-    LinkedList<AbstractTask> getHistory();
+    ArrayList<AbstractTask> getHistory();
+
+    int getTotalOfIdNumber();
 
     //TASK
     ResultOfOperation addTask(Task task);
@@ -23,7 +23,6 @@ public interface TaskManager {
     ArrayList<Task> getAllTasks();
 
     ResultOfOperation removeAllTasks();
-
 
     //EPIC
     ResultOfOperation addEpic(Epic epic);

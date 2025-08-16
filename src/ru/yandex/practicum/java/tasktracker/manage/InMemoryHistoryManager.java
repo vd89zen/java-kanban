@@ -1,13 +1,13 @@
 package ru.yandex.practicum.java.tasktracker.manage;
 
 import ru.yandex.practicum.java.tasktracker.task.AbstractTask;
-import java.util.LinkedList;
+import java.util.ArrayList;
 
 public class InMemoryHistoryManager implements HistoryManager {
-    private final LinkedList<AbstractTask> history;
+    private final LinkedHashMapCustom history;
 
     public InMemoryHistoryManager() {
-        history = new LinkedList<>();
+        history = new LinkedHashMapCustom();
     }
 
     @Override
@@ -16,17 +16,26 @@ public class InMemoryHistoryManager implements HistoryManager {
             return ResultOfOperation.ERROR_OBJECT_NULL;
         }
 
-        history.add(task);
-
-        if (history.size() > MAX_SIZE_HISTORY) {
-            history.removeFirst();
-        }
+        history.addLast(task);
 
         return ResultOfOperation.SUCCESS;
     }
 
     @Override
-    public LinkedList<AbstractTask> getHistory() {
-        return history;
+    public ResultOfOperation removeRecord(Integer idNumber) {
+        if (idNumber == null) {
+            return ResultOfOperation.ERROR_OBJECT_NULL;
+        } else if (idNumber < 0) {
+            return ResultOfOperation.ERROR_ID_LESS_ZERO;
+        }
+
+        history.removeEntry(idNumber);
+
+        return ResultOfOperation.SUCCESS;
+    }
+
+    @Override
+    public ArrayList<AbstractTask> getHistory() {
+        return history.getListAllItem();
     }
 }
