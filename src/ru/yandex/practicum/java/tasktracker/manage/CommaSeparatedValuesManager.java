@@ -12,14 +12,14 @@ public class CommaSeparatedValuesManager {
     private StatusProgress statusProgress;
     private Integer parentEpicIdNumber;
     private HashMap<Integer, StatusProgress> epicSubtasks;
-    private final String HEADERS_FOR_CSV;
-    private final byte HEADER_ID;
-    private final byte HEADER_TYPE;
-    private final byte HEADER_NAME;
-    private final byte HEADER_DESCRIPTION;
-    private final byte HEADER_STATUS_PROGRESS;
-    private final byte HEADER_PARENT_EPIC;
-    private final byte HEADER_CHILD_SUBTASKS;
+    private final String headersForCsv;
+    private final byte headerId;
+    private final byte headerType;
+    private final byte headerName;
+    private final byte headerDescription;
+    private final byte headerStatusProgress;
+    private final byte headerParentEpic;
+    private final byte headerChildSubtasks;
 
     public CommaSeparatedValuesManager() {
         idNumber = null;
@@ -28,14 +28,14 @@ public class CommaSeparatedValuesManager {
         statusProgress = null;
         parentEpicIdNumber = null;
         epicSubtasks = null;
-        HEADERS_FOR_CSV = "id,type,name,description,statusProgress,parentEpic,childSubtasks";
-        HEADER_ID = 0;
-        HEADER_TYPE = 1;
-        HEADER_NAME = 2;
-        HEADER_DESCRIPTION = 3;
-        HEADER_STATUS_PROGRESS = 4;
-        HEADER_PARENT_EPIC = 5;
-        HEADER_CHILD_SUBTASKS = 6;
+        headersForCsv = "id,type,name,description,statusProgress,parentEpic,childSubtasks";
+        headerId = 0;
+        headerType = 1;
+        headerName = 2;
+        headerDescription = 3;
+        headerStatusProgress = 4;
+        headerParentEpic = 5;
+        headerChildSubtasks = 6;
     }
 
     public String toString(Task task) {
@@ -157,7 +157,7 @@ public class CommaSeparatedValuesManager {
     }
 
     public String getHeadersForCSV() {
-        return HEADERS_FOR_CSV;
+        return headersForCsv;
     }
 
     private void resetFields() {
@@ -170,10 +170,10 @@ public class CommaSeparatedValuesManager {
     }
 
     private void setFieldsFromStrings(String[] fields) {
-        idNumber = Integer.valueOf(fields[HEADER_ID]);
-        name = fields[HEADER_NAME];
-        description = fields[HEADER_DESCRIPTION];
-        switch (fields[HEADER_STATUS_PROGRESS]) {
+        idNumber = Integer.valueOf(fields[headerId]);
+        name = fields[headerName];
+        description = fields[headerDescription];
+        switch (fields[headerStatusProgress]) {
             case "NEW":
                 statusProgress = StatusProgress.NEW;
                 break;
@@ -187,18 +187,18 @@ public class CommaSeparatedValuesManager {
                 statusProgress = null;
         }
 
-        switch (fields[HEADER_PARENT_EPIC]) {
+        switch (fields[headerParentEpic]) {
             case "SKIP":
                 break;
             default:
-                parentEpicIdNumber = Integer.valueOf(fields[HEADER_PARENT_EPIC]);
+                parentEpicIdNumber = Integer.valueOf(fields[headerParentEpic]);
         }
 
-        final boolean isSkip = fields[HEADER_CHILD_SUBTASKS].equals("SKIP") || fields[HEADER_CHILD_SUBTASKS].equals("null");
+        final boolean isSkip = fields[headerChildSubtasks].equals("SKIP") || fields[headerChildSubtasks].equals("null");
 
         if (isSkip == false) {
             epicSubtasks = new HashMap<>();
-            final String[] childSubtasks = fields[HEADER_CHILD_SUBTASKS].split("-");
+            final String[] childSubtasks = fields[headerChildSubtasks].split("-");
             StatusProgress statusProgressSubtask;
             Integer idNumberSubtask;
             for (int i = 0; i < childSubtasks.length; i += 2) {
