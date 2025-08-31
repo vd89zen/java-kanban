@@ -1,15 +1,12 @@
 package ru.yandex.practicum.java.tasktracker.manage;
 
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import ru.yandex.practicum.java.tasktracker.task.StatusProgress;
 import ru.yandex.practicum.java.tasktracker.task.Task;
-
 import java.io.File;
 import java.io.IOException;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("Тесты для InMemoryTaskManager")

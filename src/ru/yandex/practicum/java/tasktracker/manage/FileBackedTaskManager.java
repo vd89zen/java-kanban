@@ -112,7 +112,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                 throw new ManagerSaveException("Ошибка записи в файл: " + file.getName());
             }
         } catch (IOException exception) {
-            throw new ManagerSaveException("Ошибка создания директории: " + file.getParent().toString());
+            throw new ManagerSaveException("Ошибка создания директории: " + file.getParent());
         }
     }
 

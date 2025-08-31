@@ -113,7 +113,7 @@ public class CommaSeparatedValuesManager {
 
         final String subtasksIdAndStatus;
         final HashMap<Integer, StatusProgress> subtasks = new HashMap<>(epic.getSubtasksIdAndStatus());
-        if (subtasks.size() == 0 || subtasks == null) {
+        if (subtasks.isEmpty() || subtasks == null) {
             subtasksIdAndStatus = "null";
         } else {
             final ArrayList<String> subtasksList = new ArrayList<>(subtasks.size());
