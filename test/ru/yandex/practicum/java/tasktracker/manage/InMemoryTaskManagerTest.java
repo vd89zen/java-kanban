@@ -51,21 +51,21 @@ class InMemoryTaskManagerTest {
 
     @BeforeEach
     public void Prepare_For_Test() {
-        inMemoryTaskManager = ManagersUtil.getDefault();
+        inMemoryTaskManager = new InMemoryTaskManager();
 
-        baseTask1 = new Task(BASE_TASK_1_NAME, DESCRIPTION, StatusProgress.NEW, BASE_TASK_1_ID);
-        baseTask2 = new Task(BASE_TASK_2_NAME, DESCRIPTION, StatusProgress.NEW, BASE_TASK_2_ID);
+        baseTask1 = new Task(BASE_TASK_1_ID, BASE_TASK_1_NAME, DESCRIPTION, StatusProgress.NEW);
+        baseTask2 = new Task(BASE_TASK_2_ID, BASE_TASK_2_NAME, DESCRIPTION, StatusProgress.NEW);
         inMemoryTaskManager.addTask(baseTask1);
         inMemoryTaskManager.addTask(baseTask2);
 
-        baseEpic1 = new Epic(BASE_EPIC_1_NAME, DESCRIPTION, BASE_EPIC_1_ID);
-        baseEpic2 = new Epic(BASE_EPIC_2_NAME, DESCRIPTION, BASE_EPIC_2_ID);
+        baseEpic1 = new Epic(BASE_EPIC_1_ID, BASE_EPIC_1_NAME, DESCRIPTION);
+        baseEpic2 = new Epic(BASE_EPIC_2_ID, BASE_EPIC_2_NAME, DESCRIPTION);
         inMemoryTaskManager.addEpic(baseEpic1);
         inMemoryTaskManager.addEpic(baseEpic2);
 
-        baseSubtask1 = new Subtask(BASE_EPIC_1_ID,BASE_SUBTASK_1_NAME, DESCRIPTION, StatusProgress.NEW, BASE_SUBTASK_1_ID);
-        baseSubtask2 = new Subtask(BASE_EPIC_2_ID,BASE_SUBTASK_2_NAME, DESCRIPTION, StatusProgress.NEW, BASE_SUBTASK_2_ID);
-        baseSubtask3 = new Subtask(BASE_EPIC_2_ID,BASE_SUBTASK_3_NAME, DESCRIPTION, StatusProgress.NEW, BASE_SUBTASK_3_ID);
+        baseSubtask1 = new Subtask(BASE_SUBTASK_1_ID, BASE_SUBTASK_1_NAME, DESCRIPTION, StatusProgress.NEW, BASE_EPIC_1_ID);
+        baseSubtask2 = new Subtask(BASE_SUBTASK_2_ID, BASE_SUBTASK_2_NAME, DESCRIPTION, StatusProgress.NEW, BASE_EPIC_2_ID);
+        baseSubtask3 = new Subtask(BASE_SUBTASK_3_ID, BASE_SUBTASK_3_NAME, DESCRIPTION, StatusProgress.NEW, BASE_EPIC_2_ID);
         inMemoryTaskManager.addSubtask(baseSubtask1);
         inMemoryTaskManager.addSubtask(baseSubtask2);
         inMemoryTaskManager.addSubtask(baseSubtask3);
@@ -108,7 +108,7 @@ class InMemoryTaskManagerTest {
             //Given
             expectedResult = ResultOfOperation.SUCCESS;
             Integer setIdNumber = 888;
-            Task testTask3 = new Task("testTask3", DESCRIPTION, StatusProgress.NEW, setIdNumber);
+            Task testTask3 = new Task(setIdNumber, "testTask3", DESCRIPTION, StatusProgress.NEW);
             System.out.println("\nTasks BEFORE test 'Проверяем добавление Task с заданным ID':");
             System.out.println(inMemoryTaskManager.getAllTasks());
             //When
@@ -124,7 +124,7 @@ class InMemoryTaskManagerTest {
         void addTask_With_IdNumber_Already_In_Manager_Test() {
             //Given
             expectedResult = ResultOfOperation.ERROR_OBJECT_ALREADY_EXISTS;
-            Task testTask4 = new Task("testTask4", DESCRIPTION, StatusProgress.NEW, BASE_TASK_1_ID);
+            Task testTask4 = new Task(BASE_TASK_1_ID, "testTask4", DESCRIPTION, StatusProgress.NEW);
             //When
             actualResult = inMemoryTaskManager.addTask(testTask4);
             //Then
@@ -141,7 +141,7 @@ class InMemoryTaskManagerTest {
             inMemoryTaskManager.removeTaskForIdNumber(BASE_TASK_2_ID);
             System.out.println(inMemoryTaskManager.getAllTasks());
             //When
-            Task testTask5 = new Task("testTask5", DESCRIPTION, StatusProgress.NEW, BASE_TASK_2_ID);
+            Task testTask5 = new Task(BASE_TASK_2_ID, "testTask5", DESCRIPTION, StatusProgress.NEW);
             actualResult = inMemoryTaskManager.addTask(testTask5);
             System.out.println("\nTasks AFTER test 'Проверяем добавление Task c ID ранее удалённой Task':");
             System.out.println(inMemoryTaskManager.getAllTasks());
@@ -373,7 +373,7 @@ class InMemoryTaskManagerTest {
         @DisplayName("Проверяем добавление Subtask чей Epic есть в базе Менеджера")
         void addSubtask_New_To_Exists_Epic_Test() {
             //Given
-            Subtask testSubtask1 = new Subtask(BASE_EPIC_2_ID,"testSubtask1", DESCRIPTION, StatusProgress.NEW);
+            Subtask testSubtask1 = new Subtask("testSubtask1", DESCRIPTION, StatusProgress.NEW, BASE_EPIC_2_ID);
             expectedResult = ResultOfOperation.SUCCESS;
             //When
             actualResult = inMemoryTaskManager.addSubtask(testSubtask1);
@@ -386,8 +386,8 @@ class InMemoryTaskManagerTest {
         void addSubtask_New_To_Not_Exists_Epic_Test() {
             //Given
             Integer notExistsParentEpicIdNumber = 666;
-            Subtask testSubtask2 = new Subtask(notExistsParentEpicIdNumber, "testSubtask2"
-                    , DESCRIPTION, StatusProgress.NEW);
+            Subtask testSubtask2 = new Subtask("testSubtask2", DESCRIPTION, StatusProgress.NEW,
+                    notExistsParentEpicIdNumber);
             expectedResult = ResultOfOperation.ERROR_MISMATCH_PARENT_ID;
             //When
             actualResult = inMemoryTaskManager.addSubtask(testSubtask2);
@@ -462,7 +462,7 @@ class InMemoryTaskManagerTest {
             //Given
             String expectedName = "testSubtask2";
             String newName = "testSubtask2-NEW";
-            Subtask testSubtask2 = new Subtask(BASE_EPIC_2_ID, expectedName, DESCRIPTION, StatusProgress.NEW);
+            Subtask testSubtask2 = new Subtask(expectedName, DESCRIPTION, StatusProgress.NEW, BASE_EPIC_2_ID);
             inMemoryTaskManager.addSubtask(testSubtask2);
             //When
             testSubtask2.setName(newName);

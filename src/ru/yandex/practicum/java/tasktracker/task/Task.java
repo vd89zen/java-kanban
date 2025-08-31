@@ -8,6 +8,7 @@ public class Task extends AbstractTask {
 
     public Task() {
         super();
+        type = TypesTasks.TASK;
     }
 
     public Task(Task task) {
@@ -16,10 +17,12 @@ public class Task extends AbstractTask {
 
     public Task(String name, String description, StatusProgress statusProgress) {
         super(name, description, statusProgress);
+        type = TypesTasks.TASK;
     }
 
-    public Task(String name, String description, StatusProgress statusProgress, Integer idNumber) {
-        super(name, description, statusProgress, idNumber);
+    public Task(Integer idNumber, String name, String description, StatusProgress statusProgress) {
+        super(idNumber, name, description, statusProgress);
+        type = TypesTasks.TASK;
     }
 
     public ResultOfOperation setStatusProgress(StatusProgress statusProgress) {

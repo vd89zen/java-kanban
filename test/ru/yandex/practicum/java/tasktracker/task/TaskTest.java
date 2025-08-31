@@ -16,8 +16,8 @@ class TaskTest {
         StatusProgress taskStatusProgress = StatusProgress.IN_PROGRESS;
         Integer taskIdNumber = 888;
         //When
-        Task task1 =  new Task(taskName, taskDescription, taskStatusProgress, taskIdNumber);
-        Task task2 =  new Task(taskName, taskDescription, taskStatusProgress, taskIdNumber);
+        Task task1 =  new Task(taskIdNumber, taskName, taskDescription, taskStatusProgress);
+        Task task2 =  new Task(taskIdNumber, taskName, taskDescription, taskStatusProgress);
         //Then
         assertEquals(task1, task2);
     }

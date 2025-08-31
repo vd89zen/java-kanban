@@ -6,9 +6,34 @@ import java.util.Objects;
 public class Subtask extends AbstractTask {
     private Integer parentEpicIdNumber;
 
+    public static Subtask fromString(String commaSeparatedValues) {
+        String[] fields = commaSeparatedValues.split(",");
+        final Integer idNumber = Integer.valueOf(fields[1]);
+        final String name = fields[2];
+        final String description = fields[3];
+        final StatusProgress statusProgress;
+        switch (fields[4]) {
+            case "NEW":
+                statusProgress = StatusProgress.NEW;
+                break;
+            case "IN_PROGRESS":
+                statusProgress = StatusProgress.IN_PROGRESS;
+                break;
+            case "DONE":
+                statusProgress = StatusProgress.DONE;
+                break;
+            default:
+                statusProgress = null;
+        }
+        final Integer parentEpicIdNumber = Integer.valueOf(fields[5]);
+
+        return new Subtask(idNumber, name, description, statusProgress, parentEpicIdNumber);
+    }
+
     public Subtask() {
         super();
         this.parentEpicIdNumber = null;
+        type = TypesTasks.SUBTASK;
     }
 
     public Subtask(Subtask subtask) {
@@ -16,14 +41,16 @@ public class Subtask extends AbstractTask {
         this.parentEpicIdNumber = subtask.parentEpicIdNumber;
     }
 
-    public Subtask(Integer parentEpicIdNumber, String name, String description, StatusProgress statusProgress) {
+    public Subtask(String name, String description, StatusProgress statusProgress, Integer parentEpicIdNumber) {
         super(name, description, statusProgress);
         this.parentEpicIdNumber = Objects.requireNonNull(parentEpicIdNumber, "'parentEpicIdNumber' can't be null");
+        type = TypesTasks.SUBTASK;
     }
 
-    public Subtask(Integer parentEpicIdNumber, String name, String description, StatusProgress statusProgress, Integer idNumber) {
-        super(name, description, statusProgress, idNumber);
+    public Subtask(Integer idNumber, String name, String description, StatusProgress statusProgress, Integer parentEpicIdNumber) {
+        super(idNumber, name, description, statusProgress);
         this.parentEpicIdNumber = Objects.requireNonNull(parentEpicIdNumber, "'parentEpicIdNumber' can't be null");
+        type = TypesTasks.SUBTASK;
     }
 
     public ResultOfOperation setStatusProgress(StatusProgress statusProgress) {
@@ -52,14 +79,14 @@ public class Subtask extends AbstractTask {
 
     @Override
     public String toString() {
-        String descriptionLength;
+        final String descriptionLength;
         if (description == null) {
             descriptionLength = "null";
         } else {
             descriptionLength = String.format("%d", description.length());
         }
 
-        String statusProgressName;
+        final String statusProgressName;
         if (statusProgress == null) {
             statusProgressName = "null";
         } else {
@@ -75,7 +102,7 @@ public class Subtask extends AbstractTask {
         if (this == object) return true;
         if (object == null || getClass() != object.getClass()) return false;
 
-        Subtask subtask = (Subtask) object;
+        final Subtask subtask = (Subtask) object;
 
         return idNumber == subtask.idNumber
                 && parentEpicIdNumber == subtask.parentEpicIdNumber

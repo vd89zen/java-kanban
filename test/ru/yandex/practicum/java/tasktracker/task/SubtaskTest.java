@@ -17,10 +17,10 @@ class SubtaskTest {
         Integer subtaskIdNumber = 333;
         Integer subtaskParentEpicIdNumber = 777;
         //When
-        Subtask subtask1 =  new Subtask(subtaskParentEpicIdNumber, subtaskName, subtaskDescription
-                , subtaskStatusProgress, subtaskIdNumber);
-        Subtask subtask2 =  new Subtask(subtaskParentEpicIdNumber, subtaskName, subtaskDescription
-                , subtaskStatusProgress, subtaskIdNumber);
+        Subtask subtask1 =  new Subtask(subtaskIdNumber, subtaskName, subtaskDescription, subtaskStatusProgress, subtaskParentEpicIdNumber
+        );
+        Subtask subtask2 =  new Subtask(subtaskIdNumber, subtaskName, subtaskDescription, subtaskStatusProgress, subtaskParentEpicIdNumber
+        );
         //Then
         assertEquals(subtask1, subtask2);
     }

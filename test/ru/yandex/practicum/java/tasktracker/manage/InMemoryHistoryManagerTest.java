@@ -20,7 +20,7 @@ class InMemoryHistoryManagerTest {
     @BeforeEach
     public void Prepare_For_Test() {
         inMemoryHistoryManager = new InMemoryHistoryManager();
-        baseTask1 = new Task(BASE_TASK_1_NAME, DESCRIPTION, StatusProgress.NEW, BASE_TASK_1_ID);
+        baseTask1 = new Task(BASE_TASK_1_ID, BASE_TASK_1_NAME, DESCRIPTION, StatusProgress.NEW);
     }
 
     @Test
