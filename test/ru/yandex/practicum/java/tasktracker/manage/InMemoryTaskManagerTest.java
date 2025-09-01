@@ -2,7 +2,13 @@ package ru.yandex.practicum.java.tasktracker.manage;
 
 import org.junit.jupiter.api.*;
 import static org.junit.jupiter.api.Assertions.*;
+
+import ru.yandex.practicum.java.tasktracker.service.InMemoryTaskManager;
 import ru.yandex.practicum.java.tasktracker.task.*;
+import ru.yandex.practicum.java.tasktracker.utils.ResultOfOperation;
+import ru.yandex.practicum.java.tasktracker.utils.StatusProgress;
+import ru.yandex.practicum.java.tasktracker.utils.TaskManager;
+
 import java.util.ArrayList;
 
 @DisplayName("Тесты для InMemoryTaskManager. ID - idNumber, уникальный идентификатор")

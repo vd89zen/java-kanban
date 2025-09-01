@@ -3,7 +3,9 @@ package ru.yandex.practicum.java.tasktracker.manage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import ru.yandex.practicum.java.tasktracker.task.StatusProgress;
+import ru.yandex.practicum.java.tasktracker.service.InMemoryHistoryManager;
+import ru.yandex.practicum.java.tasktracker.utils.ResultOfOperation;
+import ru.yandex.practicum.java.tasktracker.utils.StatusProgress;
 import ru.yandex.practicum.java.tasktracker.task.Task;
 import static org.junit.jupiter.api.Assertions.*;
 

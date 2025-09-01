@@ -1,6 +1,10 @@
 package ru.yandex.practicum.java.tasktracker.task;
 
-import ru.yandex.practicum.java.tasktracker.manage.ResultOfOperation;
+import ru.yandex.practicum.java.tasktracker.utils.AbstractTask;
+import ru.yandex.practicum.java.tasktracker.utils.ResultOfOperation;
+import ru.yandex.practicum.java.tasktracker.utils.StatusProgress;
+import ru.yandex.practicum.java.tasktracker.utils.TypesTasks;
+
 import java.util.Objects;
 
 public class Subtask extends AbstractTask {

@@ -1,6 +1,10 @@
-package ru.yandex.practicum.java.tasktracker.manage;
+package ru.yandex.practicum.java.tasktracker.service;
 
-import ru.yandex.practicum.java.tasktracker.task.AbstractTask;
+import ru.yandex.practicum.java.tasktracker.utils.AbstractTask;
+import ru.yandex.practicum.java.tasktracker.utils.HistoryManager;
+import ru.yandex.practicum.java.tasktracker.utils.LinkedHashMapCustom;
+import ru.yandex.practicum.java.tasktracker.utils.ResultOfOperation;
+
 import java.util.ArrayList;
 
 public class InMemoryHistoryManager implements HistoryManager {

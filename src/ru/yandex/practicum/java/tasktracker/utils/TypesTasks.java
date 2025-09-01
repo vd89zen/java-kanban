@@ -1,4 +1,4 @@
-package ru.yandex.practicum.java.tasktracker.task;
+package ru.yandex.practicum.java.tasktracker.utils;
 
 public enum TypesTasks {
     TASK,

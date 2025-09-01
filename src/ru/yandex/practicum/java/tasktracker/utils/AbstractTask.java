@@ -1,6 +1,5 @@
-package ru.yandex.practicum.java.tasktracker.task;
+package ru.yandex.practicum.java.tasktracker.utils;
 
-import ru.yandex.practicum.java.tasktracker.manage.ResultOfOperation;
 import java.util.Objects;
 
 public abstract class AbstractTask {

@@ -1,11 +1,12 @@
-package ru.yandex.practicum.java.tasktracker.manage;
+package ru.yandex.practicum.java.tasktracker.utils;
 
 import ru.yandex.practicum.java.tasktracker.task.*;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map.Entry;
 
-public class CommaSeparatedValuesManager {
+public class CommaSeparatedValuesCreateProcess {
     private Integer idNumber;
     private String name;
     private String description;
@@ -21,7 +22,7 @@ public class CommaSeparatedValuesManager {
     private final byte headerParentEpic;
     private final byte headerChildSubtasks;
 
-    public CommaSeparatedValuesManager() {
+    public CommaSeparatedValuesCreateProcess() {
         idNumber = null;
         name = null;
         description = null;
