@@ -1,38 +1,39 @@
-package ru.yandex.practicum.java.tasktracker.task;
+package ru.yandex.practicum.java.tasktracker.utils;
 
-import ru.yandex.practicum.java.tasktracker.manage.ResultOfOperation;
 import java.util.Objects;
 
 public abstract class AbstractTask {
+    protected Integer idNumber;
     protected String name;
     protected String description;
     protected StatusProgress statusProgress;
-    protected Integer idNumber;
+    protected TypesTasks type;
 
     //возможность создания пустышки; в том числе для случаев, когда объект не найден
     protected AbstractTask() {
+        this.idNumber = null;
         this.name = null;
         this.description = null;
         this.statusProgress = null;
-        this.idNumber = null;
     }
 
     //возможность создания копии
     protected AbstractTask(AbstractTask task) {
+        this.idNumber = task.idNumber;
         this.name = task.name;
         this.description = task.description;
         this.statusProgress = task.statusProgress;
-        this.idNumber = task.idNumber;
+        this.type = task.type;
     }
 
     protected AbstractTask(String name, String description, StatusProgress statusProgress) {
+        idNumber = 0;
         this.name = Objects.requireNonNull(name, "'name' can't be null");
         this.description = Objects.requireNonNull(description, "'description' can't be null");
         this.statusProgress = Objects.requireNonNull(statusProgress, "'statusProgress' can't be null");
-        idNumber = 0;
     }
 
-    protected AbstractTask(String name, String description, StatusProgress statusProgress, Integer idNumber) {
+    protected AbstractTask(Integer idNumber, String name, String description, StatusProgress statusProgress) {
         this.name = Objects.requireNonNull(name, "'name' can't be null");
         this.description = Objects.requireNonNull(description, "'description' can't be null");
         this.statusProgress = Objects.requireNonNull(statusProgress, "'statusProgress' can't be null");

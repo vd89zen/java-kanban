@@ -3,7 +3,9 @@ package ru.yandex.practicum.java.tasktracker.manage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import ru.yandex.practicum.java.tasktracker.task.StatusProgress;
+import ru.yandex.practicum.java.tasktracker.service.InMemoryHistoryManager;
+import ru.yandex.practicum.java.tasktracker.utils.ResultOfOperation;
+import ru.yandex.practicum.java.tasktracker.utils.StatusProgress;
 import ru.yandex.practicum.java.tasktracker.task.Task;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -20,7 +22,7 @@ class InMemoryHistoryManagerTest {
     @BeforeEach
     public void Prepare_For_Test() {
         inMemoryHistoryManager = new InMemoryHistoryManager();
-        baseTask1 = new Task(BASE_TASK_1_NAME, DESCRIPTION, StatusProgress.NEW, BASE_TASK_1_ID);
+        baseTask1 = new Task(BASE_TASK_1_ID, BASE_TASK_1_NAME, DESCRIPTION, StatusProgress.NEW);
     }
 
     @Test

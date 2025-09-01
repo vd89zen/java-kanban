@@ -1,6 +1,5 @@
-package ru.yandex.practicum.java.tasktracker.manage;
+package ru.yandex.practicum.java.tasktracker.utils;
 
-import ru.yandex.practicum.java.tasktracker.task.AbstractTask;
 import ru.yandex.practicum.java.tasktracker.task.Epic;
 import ru.yandex.practicum.java.tasktracker.task.Subtask;
 import ru.yandex.practicum.java.tasktracker.task.Task;

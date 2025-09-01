@@ -1,6 +1,9 @@
 package ru.yandex.practicum.java.tasktracker.task;
 
-import ru.yandex.practicum.java.tasktracker.manage.ResultOfOperation;
+import ru.yandex.practicum.java.tasktracker.utils.AbstractTask;
+import ru.yandex.practicum.java.tasktracker.utils.ResultOfOperation;
+import ru.yandex.practicum.java.tasktracker.utils.StatusProgress;
+import ru.yandex.practicum.java.tasktracker.utils.TypesTasks;
 
 import java.util.Objects;
 
@@ -8,6 +11,7 @@ public class Task extends AbstractTask {
 
     public Task() {
         super();
+        type = TypesTasks.TASK;
     }
 
     public Task(Task task) {
@@ -16,10 +20,12 @@ public class Task extends AbstractTask {
 
     public Task(String name, String description, StatusProgress statusProgress) {
         super(name, description, statusProgress);
+        type = TypesTasks.TASK;
     }
 
-    public Task(String name, String description, StatusProgress statusProgress, Integer idNumber) {
-        super(name, description, statusProgress, idNumber);
+    public Task(Integer idNumber, String name, String description, StatusProgress statusProgress) {
+        super(idNumber, name, description, statusProgress);
+        type = TypesTasks.TASK;
     }
 
     public ResultOfOperation setStatusProgress(StatusProgress statusProgress) {

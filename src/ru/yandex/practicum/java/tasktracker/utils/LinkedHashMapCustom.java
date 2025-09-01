@@ -1,6 +1,5 @@
-package ru.yandex.practicum.java.tasktracker.manage;
+package ru.yandex.practicum.java.tasktracker.utils;
 
-import ru.yandex.practicum.java.tasktracker.task.AbstractTask;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Objects;

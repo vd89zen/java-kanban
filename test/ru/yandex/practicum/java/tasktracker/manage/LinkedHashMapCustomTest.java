@@ -4,8 +4,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
-import ru.yandex.practicum.java.tasktracker.task.AbstractTask;
-import ru.yandex.practicum.java.tasktracker.task.StatusProgress;
+import ru.yandex.practicum.java.tasktracker.utils.AbstractTask;
+import ru.yandex.practicum.java.tasktracker.utils.LinkedHashMapCustom;
+import ru.yandex.practicum.java.tasktracker.utils.ResultOfOperation;
+import ru.yandex.practicum.java.tasktracker.utils.StatusProgress;
 import ru.yandex.practicum.java.tasktracker.task.Task;
 import java.util.ArrayList;
 
@@ -30,9 +32,9 @@ class LinkedHashMapCustomTest {
     @BeforeEach
     public void Prepare_For_Test() {
         history = new LinkedHashMapCustom();
-        baseTask1 = new Task(BASE_TASK_1_NAME, DESCRIPTION, StatusProgress.NEW, BASE_TASK_1_ID);
-        baseTask2 = new Task(BASE_TASK_2_NAME, DESCRIPTION, StatusProgress.NEW, BASE_TASK_2_ID);
-        baseTask3 = new Task(BASE_TASK_3_NAME, DESCRIPTION, StatusProgress.NEW, BASE_TASK_3_ID);
+        baseTask1 = new Task(BASE_TASK_1_ID, BASE_TASK_1_NAME, DESCRIPTION, StatusProgress.NEW);
+        baseTask2 = new Task(BASE_TASK_2_ID, BASE_TASK_2_NAME, DESCRIPTION, StatusProgress.NEW);
+        baseTask3 = new Task(BASE_TASK_3_ID, BASE_TASK_3_NAME, DESCRIPTION, StatusProgress.NEW);
     }
 
     @Test

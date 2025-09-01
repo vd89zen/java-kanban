@@ -1,6 +1,10 @@
 package ru.yandex.practicum.java.tasktracker.task;
 
-import ru.yandex.practicum.java.tasktracker.manage.ResultOfOperation;
+import ru.yandex.practicum.java.tasktracker.utils.AbstractTask;
+import ru.yandex.practicum.java.tasktracker.utils.ResultOfOperation;
+import ru.yandex.practicum.java.tasktracker.utils.StatusProgress;
+import ru.yandex.practicum.java.tasktracker.utils.TypesTasks;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Objects;
@@ -11,6 +15,7 @@ public class Epic extends AbstractTask {
     public Epic() {
         super();
         subtasks = null;
+        type = TypesTasks.EPIC;
     }
 
     public Epic(Epic epic) {
@@ -21,11 +26,13 @@ public class Epic extends AbstractTask {
     public Epic(String name, String description) {
         super(name, description, StatusProgress.NEW);
         subtasks = new HashMap<>();
+        type = TypesTasks.EPIC;
     }
 
-    public Epic(String name, String description, Integer idNumber) {
-        super(name, description, StatusProgress.NEW, idNumber);
+    public Epic(Integer idNumber, String name, String description) {
+        super(idNumber, name, description, StatusProgress.NEW);
         subtasks = new HashMap<>();
+        type = TypesTasks.EPIC;
     }
 
     public ResultOfOperation addSubtask(Integer subtaskIdNumber, StatusProgress subtaskStatusProgress) {
@@ -56,12 +63,20 @@ public class Epic extends AbstractTask {
         }
     }
 
-    public ArrayList<Integer> getAllSubtasksIdNumber() {
+    public ArrayList<Integer> getSubtasksIdNumber() {
         if (subtasks.isEmpty()) {
             return new ArrayList<>();
         }
 
         return new ArrayList<>(subtasks.keySet());
+    }
+
+    public HashMap<Integer, StatusProgress> getSubtasksIdAndStatus() {
+        if (subtasks.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        return new HashMap<>(subtasks);
     }
 
     public void removeAllSubtasksIdNumber() {

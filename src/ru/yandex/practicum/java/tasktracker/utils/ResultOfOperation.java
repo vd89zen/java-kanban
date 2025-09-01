@@ -1,4 +1,4 @@
-package ru.yandex.practicum.java.tasktracker.manage;
+package ru.yandex.practicum.java.tasktracker.utils;
 
 public enum ResultOfOperation {
     SUCCESS,

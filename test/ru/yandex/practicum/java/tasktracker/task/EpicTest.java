@@ -16,8 +16,8 @@ class EpicTest {
         String epicDescription = "description";
         Integer epicIdNumber = 777;
         //When
-        Epic epic1 =  new Epic(epicName, epicDescription, epicIdNumber);
-        Epic epic2 =  new Epic(epicName, epicDescription, epicIdNumber);
+        Epic epic1 =  new Epic(epicIdNumber, epicName, epicDescription);
+        Epic epic2 =  new Epic(epicIdNumber, epicName, epicDescription);
         //Then
         assertEquals(epic1, epic2);
     }
