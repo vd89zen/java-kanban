@@ -1,13 +1,9 @@
 package ru.yandex.practicum.java.tasktracker;
 
-import ru.yandex.practicum.java.tasktracker.exceptions.*;
-import ru.yandex.practicum.java.tasktracker.manage.*;
 import ru.yandex.practicum.java.tasktracker.service.*;
-import ru.yandex.practicum.java.tasktracker.task.*;
 import ru.yandex.practicum.java.tasktracker.utils.*;
 import java.io.File;
 import java.io.IOException;
-import java.time.LocalDateTime;
 
 public class Main {
     public static void main(String[] args) throws IOException {
