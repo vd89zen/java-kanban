@@ -94,7 +94,7 @@ public class Epic extends AbstractTask {
             return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
         } else if (subtask.getIdNumber() < 0 || idNumber < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
-        } if (subtasksFields.containsKey(subtask.getIdNumber()) == false) {
+        } else if (subtasksFields.containsKey(subtask.getIdNumber()) == false) {
             return ResultOfOperation.ERROR_SUBTASK_NOT_FOUND;
         }
 
@@ -216,7 +216,7 @@ public class Epic extends AbstractTask {
         }
 
         String startEpic = Objects.toString(startDateTime, "null");
-        String endEpic = Objects.toString(endDateTime, "null");;
+        String endEpic = Objects.toString(endDateTime, "null");
 
         return String.format("%nEpic{name='%s', description.length='%s', Status Progress='%s', ID number='%d', " +
                         "number of subtasks='%s', duration in minutes='%s', start DateTime='%s', end DateTime='%s'",
