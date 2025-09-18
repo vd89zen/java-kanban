@@ -4,50 +4,60 @@ import ru.yandex.practicum.java.tasktracker.task.Epic;
 import ru.yandex.practicum.java.tasktracker.task.Subtask;
 import ru.yandex.practicum.java.tasktracker.task.Task;
 import java.util.ArrayList;
+import java.util.Optional;
+import java.util.TreeSet;
 
 public interface TaskManager {
+    TreeSet<AbstractTask> getPrioritizedTasks();
+
+    boolean isTimeIntersectBoth(AbstractTask taskOne, AbstractTask taskTwo);
+
+    boolean isTimeIntersectWithOthers(AbstractTask task);
+
     ArrayList<AbstractTask> getHistory();
 
-    int getTotalOfIdNumber();
+    int getTotalOfIdInWork();
 
     //TASK
     ResultOfOperation addTask(Task task);
 
-    Task getTaskForIdNumber(Integer taskIdNumber);
+    Optional<Task> getTaskForIdNumber(int taskIdNumber);
 
-    ResultOfOperation removeTaskForIdNumber(Integer taskIdNumber);
+    ResultOfOperation removeTaskForIdNumber(int taskIdNumber);
 
     ResultOfOperation updateTask(Task task);
 
-    ArrayList<Task> getAllTasks();
+    Optional<ArrayList<Task>> getAllTasks();
 
     ResultOfOperation removeAllTasks();
 
     //EPIC
     ResultOfOperation addEpic(Epic epic);
 
-    Epic getEpicForIdNumber(Integer epicIdNumber);
+    Optional<Epic> getEpicForIdNumber(int epicIdNumber);
 
-    ResultOfOperation removeEpicForIdNumber(Integer epicIdNumber);
+    ResultOfOperation removeEpicForIdNumber(int epicIdNumber);
 
-    ResultOfOperation updateEpic(Epic epic);
+    ResultOfOperation updateEpicName(int epicIdNumber, String newEpicName);
 
-    ArrayList<Subtask> getAllSubtasksFromEpic(Integer epicID);
+    ResultOfOperation updateEpicDescription(int epicIdNumber, String newEpicDescription);
 
-    ArrayList<Epic> getAllEpics();
+    Optional<ArrayList<Subtask>> getAllSubtasksFromEpic(int epicID);
+
+    Optional<ArrayList<Epic>> getAllEpics();
 
     ResultOfOperation removeAllEpics();
 
     //SUBTASK
     ResultOfOperation addSubtask(Subtask subtask);
 
-    Subtask getSubtaskForIdNumber(Integer subtaskIdNumber);
+    Optional<Subtask> getSubtaskForIdNumber(int subtaskIdNumber);
 
-    ResultOfOperation removeSubtaskForIdNumber(Integer subtaskIdNumber);
+    ResultOfOperation removeSubtaskForIdNumber(int subtaskIdNumber);
 
     ResultOfOperation updateSubtask(Subtask subtask);
 
-    ArrayList<Subtask> getAllSubtasks();
+    Optional<ArrayList<Subtask>> getAllSubtasks();
 
     ResultOfOperation removeAllSubtasks();
 

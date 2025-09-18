@@ -2,17 +2,12 @@ package ru.yandex.practicum.java.tasktracker.service;
 
 import ru.yandex.practicum.java.tasktracker.manage.ManagersUtil;
 import ru.yandex.practicum.java.tasktracker.task.*;
-import ru.yandex.practicum.java.tasktracker.utils.AbstractTask;
-import ru.yandex.practicum.java.tasktracker.utils.HistoryManager;
-import ru.yandex.practicum.java.tasktracker.utils.ResultOfOperation;
-import ru.yandex.practicum.java.tasktracker.utils.TaskManager;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
+import ru.yandex.practicum.java.tasktracker.utils.*;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class InMemoryTaskManager implements TaskManager {
-    private Integer counterForIdNumber;
+    private int counterForIdNumber;
     private boolean isRestarted;
     private Epic epicForWork;
     private Task taskForWork;
@@ -21,6 +16,7 @@ public class InMemoryTaskManager implements TaskManager {
     protected final HashMap<Integer, Task> tasks;
     protected final HashMap<Integer, Epic> epics;
     protected final HashMap<Integer, Subtask> subtasks;
+    protected final TreeSet<AbstractTask> prioritizedTasks;
     private final HistoryManager historyManager;
 
     public InMemoryTaskManager() {
@@ -31,6 +27,7 @@ public class InMemoryTaskManager implements TaskManager {
         counterForIdNumber = 1;
         allIdInWork = new HashSet<>();
         isRestarted = false;
+        prioritizedTasks = new TreeSet<>(Comparator.comparing((AbstractTask task) -> task.getStartDateTime().get()));
     }
 
     private ResultOfOperation generateIdNumber() {
@@ -49,8 +46,57 @@ public class InMemoryTaskManager implements TaskManager {
         return ResultOfOperation.SUCCESS;
     }
 
+    private ResultOfOperation addToPriorityList(AbstractTask task) {
+        if (task.getStartDateTime().isEmpty()) {
+            return ResultOfOperation.ERROR_START_NOT_SET;
+        }
+
+        switch (task.getTypeTask()) {
+            case TASK:
+                if (prioritizedTasks.add(new Task((Task) task))) {
+                    return ResultOfOperation.SUCCESS;
+                } else {
+                    return ResultOfOperation.ERROR_OBJECT_ALREADY_EXISTS;
+                }
+            case SUBTASK:
+                if (prioritizedTasks.add(new Subtask((Subtask) task))) {
+                    return ResultOfOperation.SUCCESS;
+                } else {
+                    return ResultOfOperation.ERROR_OBJECT_ALREADY_EXISTS;
+                }
+            default:
+                return ResultOfOperation.ERROR_OBJECT_ILLEGAL;
+        }
+    }
+
+    public boolean isTimeIntersectBoth(AbstractTask taskOne, AbstractTask taskTwo) {
+        if (taskOne == null || taskTwo == null || taskOne.getStartDateTime().isEmpty()
+                || taskTwo.getStartDateTime().isEmpty()) {
+            return false;
+        }
+
+        return !(taskOne.getEndDateTime().get().isBefore(taskTwo.getStartDateTime().get())
+                || taskOne.getStartDateTime().get().isAfter(taskTwo.getEndDateTime().get()));
+    }
+
     @Override
-    public int getTotalOfIdNumber() {
+    public boolean isTimeIntersectWithOthers(AbstractTask task) {
+        if (task == null || task.getStartDateTime().isEmpty()) {
+            return false;
+        }
+
+        return prioritizedTasks.stream()
+                .anyMatch(prioritizedTask ->
+                        isTimeIntersectBoth(task, prioritizedTask));
+    }
+
+    @Override
+    public TreeSet<AbstractTask> getPrioritizedTasks() {
+        return prioritizedTasks;
+    }
+
+    @Override
+    public int getTotalOfIdInWork() {
         return allIdInWork.size();
     }
 
@@ -65,12 +111,14 @@ public class InMemoryTaskManager implements TaskManager {
         if (task == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
         } else if (task.getName() == null || task.getDescription() == null
-                || task.getStatusProgress() == null || task.getIdNumber() == null) {
+                || task.getStatusProgress() == null) {
             return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
         } else if (task.getIdNumber() < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
         } else if (allIdInWork.contains(task.getIdNumber())) {
             return ResultOfOperation.ERROR_OBJECT_ALREADY_EXISTS;
+        } else if (isTimeIntersectWithOthers(task)) {
+            return ResultOfOperation.ERROR_INTERSECT_TIME;
         }
 
         taskForWork = new Task(task);
@@ -86,21 +134,22 @@ public class InMemoryTaskManager implements TaskManager {
 
         tasks.put(taskForWork.getIdNumber(), taskForWork);
         allIdInWork.add(taskForWork.getIdNumber());
+        addToPriorityList(taskForWork);
         taskForWork = null;
         return ResultOfOperation.SUCCESS;
     }
 
     @Override
-    public ArrayList<Task> getAllTasks() {
+    public Optional<ArrayList<Task>> getAllTasks() {
         if (tasks.isEmpty()) {
-            return new ArrayList<>();
+            return Optional.empty();
         }
 
-        ArrayList<Task> tasksForReturn = new ArrayList<>();
-        for (Task task : tasks.values()) {
-            tasksForReturn.add(new Task(task));
-        }
-        return tasksForReturn;
+        return Optional.of(
+                tasks.values().stream()
+                        .map(Task::new)
+                        .collect(Collectors.toCollection(ArrayList::new))
+        );
     }
 
     @Override
@@ -109,64 +158,58 @@ public class InMemoryTaskManager implements TaskManager {
             return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
         }
 
-        for (Integer idNumber : tasks.keySet()) {
-            historyManager.removeRecord(idNumber);
-        }
+        tasks.entrySet().forEach(entry -> {
+                    historyManager.removeRecord(entry.getKey());
+                    prioritizedTasks.remove(entry.getValue());
+        });
 
         allIdInWork.removeAll(tasks.keySet());
         tasks.clear();
-
         return ResultOfOperation.SUCCESS;
     }
 
     @Override
-    public Task getTaskForIdNumber(Integer taskIdNumber) {
-        if (taskIdNumber == null || tasks.isEmpty()) {
-            return new Task();
+    public Optional<Task> getTaskForIdNumber(int taskIdNumber) {
+        if (taskIdNumber < 0 || tasks.isEmpty() || tasks.containsKey(taskIdNumber) == false) {
+            return Optional.empty();
         }
-
-        if (tasks.containsKey(taskIdNumber)) {
-            historyManager.addRecord(tasks.get(taskIdNumber));//т.к. дубли уже не нужны, просто передаём оригинал
-            return new Task(tasks.get(taskIdNumber));
-        }
-        return new Task();
+        historyManager.addRecord(tasks.get(taskIdNumber));
+        return Optional.of(new Task(tasks.get(taskIdNumber)));
     }
 
     @Override
     public ResultOfOperation updateTask(Task task) {
-        if (tasks.isEmpty()) {
-            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
-        } else if (task == null) {
+        if (task == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
         } else if (task.getName() == null || task.getDescription() == null
-                || task.getStatusProgress() == null || task.getIdNumber() == null) {
+                || task.getStatusProgress() == null) {
             return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
+        } else if (tasks.isEmpty() || tasks.containsKey(task.getIdNumber()) == false) {
+            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
+        } else if (isTimeIntersectWithOthers(task)) {
+            return ResultOfOperation.ERROR_INTERSECT_TIME;
         }
 
-        if (tasks.containsKey(task.getIdNumber())) {
-            taskForWork = new Task(task);
-            tasks.put(taskForWork.getIdNumber(), taskForWork);
-            taskForWork = null;
-            return ResultOfOperation.SUCCESS;
-        }
-        return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
+        taskForWork = new Task(task);
+        tasks.put(taskForWork.getIdNumber(), taskForWork);
+        addToPriorityList(taskForWork);
+        taskForWork = null;
+        return ResultOfOperation.SUCCESS;
     }
 
     @Override
-    public ResultOfOperation removeTaskForIdNumber(Integer taskIdNumber) {
-        if (taskIdNumber == null) {
-            return ResultOfOperation.ERROR_OBJECT_NULL;
-        } else if (tasks.isEmpty()) {
+    public ResultOfOperation removeTaskForIdNumber(int taskIdNumber) {
+        if (taskIdNumber < 0) {
+            return ResultOfOperation.ERROR_ID_LESS_ZERO;
+        } else if (tasks.isEmpty() || tasks.containsKey(taskIdNumber) == false) {
             return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
         }
 
-        if (tasks.containsKey(taskIdNumber)) {
-            tasks.remove(taskIdNumber);
-            historyManager.removeRecord(taskIdNumber);
-            allIdInWork.remove(taskIdNumber);
-            return ResultOfOperation.SUCCESS;
-        }
-        return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
+        prioritizedTasks.remove(tasks.get(taskIdNumber));
+        tasks.remove(taskIdNumber);
+        historyManager.removeRecord(taskIdNumber);
+        allIdInWork.remove(taskIdNumber);
+        return ResultOfOperation.SUCCESS;
     }
 
     //EPIC
@@ -175,12 +218,14 @@ public class InMemoryTaskManager implements TaskManager {
         if (epic == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
         } else if (epic.getName() == null || epic.getDescription() == null
-                || epic.getStatusProgress() == null || epic.getIdNumber() == null) {
+                || epic.getStatusProgress() == null) {
             return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
         } else if (epic.getIdNumber() < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
         } else if (allIdInWork.contains(epic.getIdNumber())) {
             return ResultOfOperation.ERROR_OBJECT_ALREADY_EXISTS;
+        } else if (epic.getSubtasksIdNumber().isEmpty() == false) {
+            return ResultOfOperation.ERROR_SUBTASKS_NOT_EMPTY;
         }
 
         epicForWork = new Epic(epic);
@@ -194,14 +239,6 @@ public class InMemoryTaskManager implements TaskManager {
             }
         }
 
-        if (epicForWork.getSubtasksIdNumber().isEmpty() == false) {
-            for (Integer subtaskIdNumber : epicForWork.getSubtasksIdNumber()) {
-                if (subtasks.containsKey(subtaskIdNumber) == false) {
-                    return ResultOfOperation.ERROR_SUBTASK_NOT_FOUND;
-                }
-            }
-        }
-
         epics.put(epicForWork.getIdNumber(), epicForWork);
         allIdInWork.add(epicForWork.getIdNumber());
         epicForWork = null;
@@ -209,121 +246,123 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     @Override
-    public ArrayList<Epic> getAllEpics() {
+    public Optional<ArrayList<Epic>> getAllEpics() {
         if (epics.isEmpty()) {
-            return new ArrayList<>();
+            return Optional.empty();
         }
 
-        ArrayList<Epic> epicsForReturn = new ArrayList<>();
-        for (Epic epic : epics.values()) {
-            epicsForReturn.add(new Epic(epic));
-        }
-        return epicsForReturn;
+        return Optional.of(
+                epics.values().stream()
+                        .map(Epic::new)
+                        .collect(Collectors.toCollection(ArrayList::new))
+        );
     }
 
     @Override
-    public ArrayList<Subtask> getAllSubtasksFromEpic(Integer epicIdNumber) {
-        if (epicIdNumber == null || epics.isEmpty() || subtasks.isEmpty()) {
-            return new ArrayList<>();
+    public Optional<ArrayList<Subtask>> getAllSubtasksFromEpic(int epicIdNumber) {
+        if (epicIdNumber < 0 || epics.isEmpty() || subtasks.isEmpty()) {
+            return Optional.empty();
         }
 
-        if (epics.containsKey(epicIdNumber)) {
-            ArrayList<Subtask> allSubtasks = new ArrayList<>();
-            for (Integer subtaskIdNumber : epics.get(epicIdNumber).getSubtasksIdNumber()) {
-                allSubtasks.add(new Subtask(subtasks.get(subtaskIdNumber)));
-            }
-            return allSubtasks;
-        }
-        return new ArrayList<>();
+        return Optional.of(
+                subtasks.values().stream()
+                        .filter(subtask -> subtask.getParentEpicIdNumber() == epicIdNumber)
+                        .map(Subtask::new)
+                        .collect(Collectors.toCollection(ArrayList::new))
+        );
     }
 
+    /*
+     * Единственные два поля эпика которые можно валидно обновить вне менеджера, это имя и описание.
+     * Расчётные поля (по сути все остальные, кроме айди и списка сабтасков) в соответствующих ситуациях автоматически
+     * обновляются у экземпляра эпика, находящегося внутри менеджера. Всё что касается сабтасков эпика автоматически
+     * обновляется через менеджера. То есть обновление эпика путём полной замены эпика внутри менеджера эпиком снаружи,
+     * кроме возможности случайных(умышленных) багов (и множества проверок для их избежания) ничего не даёт.
+     * Исходя из текущей сути эпика, он всего лишь вывеска, с описанием, для группы сабтасков, и полностью расчитывается
+     * на их основе. После создания эпика, мы работаем дальше с сабтасками, смысл отдельного обновления эпика
+     * фактически теряется (только если понадобится изменить имя или описание эпика).
+     * Поэтому вместо метода updateEpic(Epic epic), введены два метода для обнобления имени и описания эпика.
+     */
     @Override
-    public ResultOfOperation updateEpic(Epic epic) {
-        if (epics.isEmpty()) {
-            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
-        } else if (epic == null) {
+    public ResultOfOperation updateEpicName(int epicIdNumber, String newEpicName) {
+        if (epicIdNumber < 0) {
+            return ResultOfOperation.ERROR_ID_LESS_ZERO;
+        } else if (newEpicName == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
-        } else if (epic.getName() == null || epic.getDescription() == null
-                || epic.getStatusProgress() == null || epic.getIdNumber() == null) {
-            return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
+        } else if (epics.isEmpty() || epics.containsKey(epicIdNumber) == false) {
+            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
         }
 
-        if (epics.containsKey(epic.getIdNumber())) {
-            epicForWork = new Epic(epic);
-            if (epicForWork.getSubtasksIdNumber().isEmpty() == false) {
-                for (Integer subtaskIdNumber : epicForWork.getSubtasksIdNumber()) {
-                    if (subtasks.containsKey(subtaskIdNumber) == false) { //т.е.подзадача в эпик добавляется через Менеджера, иначе ошибка.
-                        return ResultOfOperation.ERROR_SUBTASK_NOT_FOUND;
-                    }
-                }
-            }
-            epics.put(epicForWork.getIdNumber(), epicForWork);
-            epicForWork = null;
-            return ResultOfOperation.SUCCESS;
+        epics.get(epicIdNumber).setName(newEpicName);
+        return ResultOfOperation.SUCCESS;
+    }
+
+    @Override
+    public ResultOfOperation updateEpicDescription(int epicIdNumber, String newEpicDescription) {
+        if (epicIdNumber < 0) {
+            return ResultOfOperation.ERROR_ID_LESS_ZERO;
+        } else if (newEpicDescription == null) {
+            return ResultOfOperation.ERROR_OBJECT_NULL;
+        } else if (epics.isEmpty() || epics.containsKey(epicIdNumber) == false) {
+            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
         }
-        return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
+
+        epics.get(epicIdNumber).setDescription(newEpicDescription);
+        return ResultOfOperation.SUCCESS;
     }
 
     @Override
     public ResultOfOperation removeAllEpics() {
-        if (subtasks.isEmpty() == false) {
-            allIdInWork.removeAll(subtasks.keySet());
-            for (Integer idNumber : subtasks.keySet()) {
-                historyManager.removeRecord(idNumber);
-            }
-            subtasks.clear();
-        }
-
         if (epics.isEmpty()) {
             return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
         }
 
-        for (Integer idNumber : epics.keySet()) {
-            historyManager.removeRecord(idNumber);
+        if (subtasks.isEmpty() == false) {
+            allIdInWork.removeAll(subtasks.keySet());
+            subtasks.entrySet().forEach(entry -> {
+                historyManager.removeRecord(entry.getKey());
+                prioritizedTasks.remove(entry.getValue());
+            });
+            subtasks.clear();
         }
 
+        epics.keySet().forEach(id -> historyManager.removeRecord(id));
         allIdInWork.removeAll(epics.keySet());
         epics.clear();
         return ResultOfOperation.SUCCESS;
     }
 
     @Override
-    public Epic getEpicForIdNumber(Integer epicIdNumber) {
-        if (epicIdNumber == null || epics.isEmpty()) {
-            return new Epic();
+    public Optional<Epic> getEpicForIdNumber(int epicIdNumber) {
+        if (epicIdNumber < 0 || epics.isEmpty() || epics.containsKey(epicIdNumber) == false) {
+            return Optional.empty();
         }
-
-        if (epics.containsKey(epicIdNumber)) {
-            historyManager.addRecord(epics.get(epicIdNumber));
-            return new Epic(epics.get(epicIdNumber));
-        }
-        return new Epic();
+        historyManager.addRecord(epics.get(epicIdNumber));
+        return Optional.of(new Epic(epics.get(epicIdNumber)));
     }
 
     @Override
-    public ResultOfOperation removeEpicForIdNumber(Integer epicIdNumber) {
-        if (epicIdNumber == null) {
-            return ResultOfOperation.ERROR_OBJECT_NULL;
-        } else if (epics.isEmpty()) {
+    public ResultOfOperation removeEpicForIdNumber(int epicIdNumber) {
+        if (epicIdNumber < 0) {
+            return ResultOfOperation.ERROR_ID_LESS_ZERO;
+        } else if (epics.isEmpty() || epics.containsKey(epicIdNumber) == false) {
             return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
         }
 
-        if (epics.containsKey(epicIdNumber)) {
-            if (subtasks.isEmpty() == false) {
-                for (Integer subtaskIdNumber : epics.get(epicIdNumber).getSubtasksIdNumber()) {
-                    subtasks.remove(subtaskIdNumber);
-                    allIdInWork.remove(subtaskIdNumber);
-                    historyManager.removeRecord(subtaskIdNumber);
-                }
-            }
-
-            epics.remove(epicIdNumber);
-            allIdInWork.remove(epicIdNumber);
-            historyManager.removeRecord(epicIdNumber);
-            return ResultOfOperation.SUCCESS;
+        if (subtasks.isEmpty() == false) {
+            epics.get(epicIdNumber).getSubtasksIdNumber().orElseGet(ArrayList::new)
+                    .forEach(subtaskIdNumber -> {
+                        prioritizedTasks.remove(subtasks.get(subtaskIdNumber));
+                        subtasks.remove(subtaskIdNumber);
+                        allIdInWork.remove(subtaskIdNumber);
+                        historyManager.removeRecord(subtaskIdNumber);
+                    });
         }
 
-        return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
+        epics.remove(epicIdNumber);
+        allIdInWork.remove(epicIdNumber);
+        historyManager.removeRecord(epicIdNumber);
+        return ResultOfOperation.SUCCESS;
     }
 
     //SUBTASK
@@ -332,7 +371,7 @@ public class InMemoryTaskManager implements TaskManager {
         if (subtask == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
         } else if (subtask.getName() == null || subtask.getDescription() == null
-                || subtask.getStatusProgress() == null || subtask.getIdNumber() == null) {
+                || subtask.getStatusProgress() == null) {
             return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
         } else if (epics.isEmpty()) {
             return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
@@ -340,45 +379,48 @@ public class InMemoryTaskManager implements TaskManager {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
         } else if (allIdInWork.contains(subtask.getIdNumber())) {
             return ResultOfOperation.ERROR_OBJECT_ALREADY_EXISTS;
+        } else if (epics.containsKey(subtask.getParentEpicIdNumber()) == false) {
+            return ResultOfOperation.ERROR_MISMATCH_PARENT_ID;
+        } else if (isTimeIntersectWithOthers(subtask)) {
+            return ResultOfOperation.ERROR_INTERSECT_TIME;
         }
 
         subtaskForWork = new Subtask(subtask);
 
-        if (epics.containsKey(subtaskForWork.getParentEpicIdNumber())) {
-            if (subtaskForWork.getIdNumber() == 0) {
-                if (generateIdNumber() == ResultOfOperation.SUCCESS) {
-                    subtaskForWork.setIdNumber(counterForIdNumber);
-                    subtask.setIdNumber(counterForIdNumber);
-                } else {
-                    return ResultOfOperation.ERROR_NO_AVAILABLE_ID;
-                }
-            }
-            epicForWork = epics.get(subtaskForWork.getParentEpicIdNumber());
-            ResultOfOperation resultOfOperation = epicForWork.addSubtask(subtaskForWork.getIdNumber(),
-                    subtaskForWork.getStatusProgress());
-            if (resultOfOperation == ResultOfOperation.SUCCESS) {
-                subtasks.put(subtaskForWork.getIdNumber(), subtaskForWork);
-                allIdInWork.add(subtaskForWork.getIdNumber());
-                subtaskForWork = null;
-                return ResultOfOperation.SUCCESS;
+        if (subtaskForWork.getIdNumber() == 0) {
+            if (generateIdNumber() == ResultOfOperation.SUCCESS) {
+                subtaskForWork.setIdNumber(counterForIdNumber);
+                subtask.setIdNumber(counterForIdNumber);
             } else {
-                return resultOfOperation;
+                return ResultOfOperation.ERROR_NO_AVAILABLE_ID;
             }
         }
-        return ResultOfOperation.ERROR_MISMATCH_PARENT_ID;
+
+        epicForWork = epics.get(subtaskForWork.getParentEpicIdNumber());
+        ResultOfOperation resultOfOperation = epicForWork.addSubtask(subtaskForWork);
+        if (resultOfOperation == ResultOfOperation.SUCCESS) {
+            subtasks.put(subtaskForWork.getIdNumber(), subtaskForWork);
+            allIdInWork.add(subtaskForWork.getIdNumber());
+            addToPriorityList(subtaskForWork);
+            subtaskForWork = null;
+            epicForWork = null;
+            return ResultOfOperation.SUCCESS;
+        } else {
+            return resultOfOperation;
+        }
     }
 
     @Override
-    public ArrayList<Subtask> getAllSubtasks() {
+    public Optional<ArrayList<Subtask>> getAllSubtasks() {
         if (epics.isEmpty() || subtasks.isEmpty()) {
-            return new ArrayList<>();
+            return Optional.empty();
         }
 
-        ArrayList<Subtask> subtasksForReturn = new ArrayList<>();
-        for (Subtask subtask : subtasks.values()) {
-            subtasksForReturn.add(new Subtask(subtask));
-        }
-        return subtasksForReturn;
+        return Optional.of(
+                subtasks.values().stream()
+                        .map(Subtask::new)
+                        .collect(Collectors.toCollection(ArrayList::new))
+        );
     }
 
     @Override
@@ -387,50 +429,44 @@ public class InMemoryTaskManager implements TaskManager {
             return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
         }
 
-        for (Epic epic : epics.values()) {
-            epic.removeAllSubtasksIdNumber();
-        }
-
-        for (Integer idNumber : subtasks.keySet()) {
-            historyManager.removeRecord(idNumber);
-        }
-
+        epics.values().forEach(epic -> epic.removeAllSubtasks());
+        subtasks.entrySet().forEach(entry -> {
+            historyManager.removeRecord(entry.getKey());
+            prioritizedTasks.remove(entry.getValue());
+        });
         allIdInWork.removeAll(subtasks.keySet());
         subtasks.clear();
         return ResultOfOperation.SUCCESS;
     }
 
     @Override
-    public Subtask getSubtaskForIdNumber(Integer subtaskIdNumber) {
-        if (subtaskIdNumber == null || epics.isEmpty() || subtasks.isEmpty()) {
-            return new Subtask();
+    public Optional<Subtask> getSubtaskForIdNumber(int subtaskIdNumber) {
+        if (subtaskIdNumber < 0 || epics.isEmpty() || subtasks.isEmpty()
+                || subtasks.containsKey(subtaskIdNumber) == false) {
+            return Optional.empty();
         }
 
-        if (subtasks.containsKey(subtaskIdNumber)) {
-            historyManager.addRecord(subtasks.get(subtaskIdNumber));
-            return new Subtask(subtasks.get(subtaskIdNumber));
-        }
-        return new Subtask();
+        historyManager.addRecord(subtasks.get(subtaskIdNumber));
+        return Optional.of(new Subtask(subtasks.get(subtaskIdNumber)));
     }
 
     @Override
-    public ResultOfOperation removeSubtaskForIdNumber(Integer subtaskIdNumber) {
-        if (subtaskIdNumber == null) {
-            return ResultOfOperation.ERROR_OBJECT_NULL;
-        } else if (epics.isEmpty() || subtasks.isEmpty()) {
-            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
+    public ResultOfOperation removeSubtaskForIdNumber(int subtaskIdNumber) {
+        if (subtaskIdNumber < 0) {
+            return ResultOfOperation.ERROR_ID_LESS_ZERO;
+        } else if (epics.isEmpty() || subtasks.isEmpty() || subtasks.containsKey(subtaskIdNumber) == false) {
+            return ResultOfOperation.ERROR_SUBTASK_NOT_FOUND;
         }
 
-        if (subtasks.containsKey(subtaskIdNumber)) {
-            Integer parentEpicIdNumber = subtasks.get(subtaskIdNumber).getParentEpicIdNumber();
-            subtasks.remove(subtaskIdNumber);
-            historyManager.removeRecord(subtaskIdNumber);
-            allIdInWork.remove(subtaskIdNumber);
-            if (epics.containsKey(parentEpicIdNumber)) {
-                return epics.get(parentEpicIdNumber).removeSubtask(subtaskIdNumber);
-            }
+        int parentEpicIdNumber = subtasks.get(subtaskIdNumber).getParentEpicIdNumber();
+        subtasks.remove(subtaskIdNumber);
+        historyManager.removeRecord(subtaskIdNumber);
+        allIdInWork.remove(subtaskIdNumber);
+        if (epics.containsKey(parentEpicIdNumber)) {
+            return epics.get(parentEpicIdNumber).removeSubtask(subtaskIdNumber);
+        } else {
+            return ResultOfOperation.ERROR_MISMATCH_PARENT_ID;
         }
-        return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
     }
 
     @Override
@@ -438,28 +474,27 @@ public class InMemoryTaskManager implements TaskManager {
         if (subtask == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
         } else if (subtask.getName() == null || subtask.getDescription() == null
-                || subtask.getStatusProgress() == null || subtask.getIdNumber() == null) {
+                || subtask.getStatusProgress() == null) {
             return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
-        } else if (epics.isEmpty() || subtasks.isEmpty()) {
-            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
-        } else if (subtask.getIdNumber() < 0) {
+        }
+
+        int subtaskIdNumber = subtask.getIdNumber();
+        int subtaskParentEpicIdNumber = subtask.getParentEpicIdNumber();
+        subtaskForWork = new Subtask(subtask);
+
+        if (subtaskIdNumber < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
+        } else if (epics.isEmpty() || subtasks.isEmpty() || subtasks.containsKey(subtaskIdNumber) == false) {
+            return ResultOfOperation.ERROR_SUBTASK_NOT_FOUND;
+        } else if (epics.containsKey(subtaskParentEpicIdNumber) == false
+                || subtasks.get(subtaskIdNumber).getParentEpicIdNumber() != subtaskParentEpicIdNumber) {
+            return ResultOfOperation.ERROR_MISMATCH_PARENT_ID;
+        } else if (isTimeIntersectWithOthers(subtaskForWork)) {
+            return ResultOfOperation.ERROR_INTERSECT_TIME;
         }
 
-        if (subtasks.containsKey(subtask.getIdNumber())) {
-            subtaskForWork = subtask;
-            Integer parentEpicIdNumber = subtaskForWork.getParentEpicIdNumber();
-            if (epics.containsKey(parentEpicIdNumber)) {
-                epicForWork = epics.get(parentEpicIdNumber);
-                if (epicForWork.updateSubtask(subtaskForWork.getIdNumber(), subtaskForWork.getStatusProgress())
-                        == ResultOfOperation.SUCCESS) {
-                    subtasks.put(subtaskForWork.getIdNumber(), subtaskForWork);
-                    subtaskForWork = null;
-                    return ResultOfOperation.SUCCESS;
-                }
-            }
-        }
-        return ResultOfOperation.ERROR_SUBTASK_NOT_FOUND;
+        subtasks.put(subtaskIdNumber, subtaskForWork);
+        addToPriorityList(subtaskForWork);
+        return epics.get(subtaskParentEpicIdNumber).updateSubtask(subtask);
     }
-
 }

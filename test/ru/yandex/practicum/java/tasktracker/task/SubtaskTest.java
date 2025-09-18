@@ -3,7 +3,6 @@ package ru.yandex.practicum.java.tasktracker.task;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import ru.yandex.practicum.java.tasktracker.utils.StatusProgress;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("Тест для типа задач Subtask")

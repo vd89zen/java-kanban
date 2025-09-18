@@ -4,7 +4,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import ru.yandex.practicum.java.tasktracker.service.InMemoryHistoryManager;
 import ru.yandex.practicum.java.tasktracker.service.InMemoryTaskManager;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("Тесты для ManagersUtil (Менеджер менеджеров).")

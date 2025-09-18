@@ -1,18 +1,19 @@
 package ru.yandex.practicum.java.tasktracker.utils;
 
 import ru.yandex.practicum.java.tasktracker.task.*;
-
+import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map.Entry;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class CommaSeparatedValuesCreateProcess {
-    private Integer idNumber;
+    private int idNumber;
     private String name;
     private String description;
     private StatusProgress statusProgress;
-    private Integer parentEpicIdNumber;
-    private HashMap<Integer, StatusProgress> epicSubtasks;
+    private int parentEpicIdNumber;
+    private long durationInMinutes;
+    private LocalDateTime startDateTime;
     private final String headersForCsv;
     private final byte headerId;
     private final byte headerType;
@@ -21,15 +22,19 @@ public class CommaSeparatedValuesCreateProcess {
     private final byte headerStatusProgress;
     private final byte headerParentEpic;
     private final byte headerChildSubtasks;
+    private final byte headerDurationInMinutes;
+    private final byte headerStartDateTime;
+    private final byte headerEndDateTime;
 
     public CommaSeparatedValuesCreateProcess() {
-        idNumber = null;
+        idNumber = -1;
         name = null;
         description = null;
         statusProgress = null;
-        parentEpicIdNumber = null;
-        epicSubtasks = null;
-        headersForCsv = "id,type,name,description,statusProgress,parentEpic,childSubtasks";
+        parentEpicIdNumber = -1;
+        durationInMinutes = 0;
+        startDateTime = null;
+        headersForCsv = "id,type,name,description,statusProgress,parentEpic,childSubtasks,durationInMinutes,startDateTime,endDateTime";
         headerId = 0;
         headerType = 1;
         headerName = 2;
@@ -37,108 +42,130 @@ public class CommaSeparatedValuesCreateProcess {
         headerStatusProgress = 4;
         headerParentEpic = 5;
         headerChildSubtasks = 6;
+        headerDurationInMinutes = 7;
+        headerStartDateTime = 8;
+        headerEndDateTime = 9;
     }
 
     public String toString(Task task) {
-        final String idNumber;
-        if (task.getIdNumber() == null) {
-            idNumber = "null";
+        String id = String.valueOf(task.getIdNumber());
+        String type = TypesTasks.TASK.name();
+
+        String statusProgress = task.getStatusProgress().name();
+        String parentEpic = "SKIP";
+        String childSubtasks = "SKIP";
+        String durationInMinutes = String.valueOf(task.getDurationInMinutes());
+
+        Optional<LocalDateTime> startTask = task.getStartDateTime();
+        String startDateTime;
+        if (startTask.isPresent()) {
+            startDateTime = startTask.get().toString();
         } else {
-            idNumber = task.getIdNumber().toString();
+            startDateTime = "null";
         }
 
-        final String type = TypesTasks.TASK.name();
-
-        String statusProgress;
-        if (task.getStatusProgress() == null) {
-            statusProgress = "null";
+        Optional<LocalDateTime> endTask = task.getEndDateTime();
+        String endDateTime;
+        if (endTask.isPresent()) {
+            endDateTime = endTask.get().toString();
         } else {
-            statusProgress = task.getStatusProgress().name();
+            endDateTime = "null";
         }
 
-        final String parentEpicIdNumber = "SKIP";
-        final String subtasksIdAndStatus = "SKIP";
-
-        return String.join(",", idNumber, type, task.getName(),
-                task.getDescription(), statusProgress, parentEpicIdNumber, subtasksIdAndStatus);
+        return String.join(",", id, type, task.getName().get(), task.getDescription().get(),
+                statusProgress, parentEpic, childSubtasks, durationInMinutes, startDateTime, endDateTime);
     }
 
     public String toString(Subtask subtask) {
-        final String idNumber;
-        if (subtask.getIdNumber() == null) {
-            idNumber = "null";
+        String id = String.valueOf(subtask.getIdNumber());
+        String type = TypesTasks.SUBTASK.name();
+
+        String statusProgress = subtask.getStatusProgress().name();
+        String parentEpic = String.valueOf(subtask.getParentEpicIdNumber());
+        String childSubtasks = "SKIP";
+        String durationInMinutes = String.valueOf(subtask.getDurationInMinutes());
+
+        Optional<LocalDateTime> startSubtask = subtask.getStartDateTime();
+        String startDateTime;
+        if (startSubtask.isPresent()) {
+            startDateTime = startSubtask.get().toString();
         } else {
-            idNumber = subtask.getIdNumber().toString();
+            startDateTime = "null";
         }
 
-        final String type = TypesTasks.SUBTASK.name();
-
-        final String statusProgress;
-        if (subtask.getStatusProgress() == null) {
-            statusProgress = "null";
+        Optional<LocalDateTime> endSubtask = subtask.getEndDateTime();
+        String endDateTime;
+        if (endSubtask.isPresent()) {
+            endDateTime = endSubtask.get().toString();
         } else {
-            statusProgress = subtask.getStatusProgress().name();
+            endDateTime = "null";
         }
 
-        final String parentEpicIdNumber;
-        if (subtask.getParentEpicIdNumber() == null) {
-            parentEpicIdNumber = "null";
-        } else {
-            parentEpicIdNumber = subtask.getParentEpicIdNumber().toString();
-        }
-
-        final String subtasksIdAndStatus = "SKIP";
-
-        return String.join(",", idNumber, type, subtask.getName(),
-                subtask.getDescription(), statusProgress, parentEpicIdNumber, subtasksIdAndStatus);
+        return String.join(",", id, type, subtask.getName().get(), subtask.getDescription().get(),
+                statusProgress, parentEpic, childSubtasks, durationInMinutes, startDateTime, endDateTime);
     }
 
     public String toString(Epic epic) {
-        final String idNumber;
-        if (epic.getIdNumber() == null) {
-            idNumber = "null";
+        String id = String.valueOf(epic.getIdNumber());
+        String type = TypesTasks.EPIC.name();
+
+        String statusProgress = epic.getStatusProgress().name();
+        String parentEpic = "SKIP";
+
+        String childSubtasks;
+        Optional<ArrayList<Integer>> subtasks = epic.getSubtasksIdNumber();
+        if (subtasks.isEmpty()) {
+            childSubtasks = "EMPTY";
         } else {
-            idNumber = epic.getIdNumber().toString();
+            childSubtasks = subtasks.get().stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining("|"));
         }
 
-        final String type = TypesTasks.EPIC.name();
+        String durationInMinutes = String.valueOf(epic.getDurationInMinutes());
 
-        final String statusProgress;
-        if (epic.getStatusProgress() == null) {
-            statusProgress = "null";
+        Optional<LocalDateTime> startEpic = epic.getStartDateTime();
+        String startDateTime;
+        if (startEpic.isPresent()) {
+            startDateTime = startEpic.get().toString();
         } else {
-            statusProgress = epic.getStatusProgress().name();
+            startDateTime = "null";
         }
 
-        final String parentEpicIdNumber = "SKIP";
-
-        final String subtasksIdAndStatus;
-        final HashMap<Integer, StatusProgress> subtasks = new HashMap<>(epic.getSubtasksIdAndStatus());
-        if (subtasks.isEmpty() || subtasks == null) {
-            subtasksIdAndStatus = "null";
+        Optional<LocalDateTime> endEpic = epic.getEndDateTime();
+        String endDateTime;
+        if (endEpic.isPresent()) {
+            endDateTime = endEpic.get().toString();
         } else {
-            final ArrayList<String> subtasksList = new ArrayList<>(subtasks.size());
-            for (Entry<Integer, StatusProgress> entry : subtasks.entrySet()) {
-                subtasksList.add(entry.getKey().toString());
-                subtasksList.add(entry.getValue().name());
-            }
-            subtasksIdAndStatus = String.join("-", subtasksList);
+            endDateTime = "null";
         }
 
-        return String.join(",", idNumber, type, epic.getName(),
-                epic.getDescription(), statusProgress, parentEpicIdNumber, subtasksIdAndStatus);
+        return String.join(",", id, type, epic.getName().get(), epic.getDescription().get(), statusProgress,
+                parentEpic, childSubtasks, durationInMinutes, startDateTime, endDateTime);
     }
 
     public Task getTaskFromStrings(String[] strings) {
         setFieldsFromStrings(strings);
-        Task task = new Task(idNumber, name, description, statusProgress);
+        Task task;
+        if (startDateTime == null) {
+            task = new Task(idNumber, name, description, statusProgress, durationInMinutes);
+        } else {
+            task = new Task(idNumber, name, description, statusProgress, durationInMinutes, startDateTime);
+        }
         resetFields();
         return task;
     }
 
     public Subtask getSubtaskFromStrings(String[] strings) {
         setFieldsFromStrings(strings);
-        Subtask subtask = new Subtask(idNumber, name, description, statusProgress, parentEpicIdNumber);
+        Subtask subtask;
+        if (startDateTime == null) {
+            subtask = new Subtask(idNumber, name, description, statusProgress, parentEpicIdNumber,
+                    durationInMinutes);
+        } else {
+            subtask = new Subtask(idNumber, name, description, statusProgress, parentEpicIdNumber,
+                    durationInMinutes, startDateTime);
+        }
         resetFields();
         return subtask;
     }
@@ -146,13 +173,6 @@ public class CommaSeparatedValuesCreateProcess {
     public Epic getEpicFromStrings(String[] strings) {
         setFieldsFromStrings(strings);
         Epic epic = new Epic(idNumber, name, description);
-
-        if (epicSubtasks != null) {
-            for (Entry<Integer, StatusProgress> entry : epicSubtasks.entrySet()) {
-                epic.addSubtask(entry.getKey(), entry.getValue());
-            }
-        }
-
         resetFields();
         return epic;
     }
@@ -162,12 +182,11 @@ public class CommaSeparatedValuesCreateProcess {
     }
 
     private void resetFields() {
-        idNumber = null;
+        idNumber = -1;
         name = null;
         description = null;
         statusProgress = null;
-        parentEpicIdNumber = null;
-        epicSubtasks = null;
+        parentEpicIdNumber = -1;
     }
 
     private void setFieldsFromStrings(String[] fields) {
@@ -195,30 +214,11 @@ public class CommaSeparatedValuesCreateProcess {
                 parentEpicIdNumber = Integer.valueOf(fields[headerParentEpic]);
         }
 
-        final boolean isSkip = fields[headerChildSubtasks].equals("SKIP") || fields[headerChildSubtasks].equals("null");
-
-        if (isSkip == false) {
-            epicSubtasks = new HashMap<>();
-            final String[] childSubtasks = fields[headerChildSubtasks].split("-");
-            StatusProgress statusProgressSubtask;
-            Integer idNumberSubtask;
-            for (int i = 0; i < childSubtasks.length; i += 2) {
-                idNumberSubtask = Integer.valueOf(childSubtasks[i]);
-                switch (childSubtasks[i + 1]) {
-                    case "NEW":
-                        statusProgressSubtask = StatusProgress.NEW;
-                        break;
-                    case "IN_PROGRESS":
-                        statusProgressSubtask = StatusProgress.IN_PROGRESS;
-                        break;
-                    case "DONE":
-                        statusProgressSubtask = StatusProgress.DONE;
-                        break;
-                    default:
-                        statusProgressSubtask = null;
-                }
-                epicSubtasks.put(idNumberSubtask, statusProgressSubtask);
-            }
+        durationInMinutes = Long.valueOf(fields[headerDurationInMinutes]);
+        if (fields[headerStartDateTime].equals("null")) {
+            startDateTime = null;
+        } else {
+            startDateTime = LocalDateTime.parse(fields[headerStartDateTime]);
         }
     }
 

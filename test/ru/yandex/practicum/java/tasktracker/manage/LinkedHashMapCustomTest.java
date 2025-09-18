@@ -3,13 +3,13 @@ package ru.yandex.practicum.java.tasktracker.manage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
 import ru.yandex.practicum.java.tasktracker.utils.AbstractTask;
 import ru.yandex.practicum.java.tasktracker.utils.LinkedHashMapCustom;
 import ru.yandex.practicum.java.tasktracker.utils.ResultOfOperation;
 import ru.yandex.practicum.java.tasktracker.utils.StatusProgress;
 import ru.yandex.practicum.java.tasktracker.task.Task;
 import java.util.ArrayList;
+import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("Тесты для класса LinkedHashMapCustom (используется для хранения истории")
 class LinkedHashMapCustomTest {
