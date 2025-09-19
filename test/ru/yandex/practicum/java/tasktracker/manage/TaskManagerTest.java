@@ -4,7 +4,6 @@ import ru.yandex.practicum.java.tasktracker.task.*;
 import ru.yandex.practicum.java.tasktracker.utils.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.Optional;
 import java.util.TreeSet;
 import org.junit.jupiter.api.*;
@@ -720,14 +719,25 @@ abstract class TaskManagerTest<T extends TaskManager> {
     @DisplayName("Проверяем получение списка приоритетных задач")
     void getPrioritizedTasks_Test() {
         //Given
-        TreeSet<AbstractTask> expectedSet = new TreeSet<>(Comparator.comparing((AbstractTask task) ->
-                task.getStartDateTime().get()));
+        TreeSet<AbstractTask> expectedSet = new TreeSet<>((task1, task2) -> {
+            if (task1.getIdNumber() == task2.getIdNumber()) {
+                return 0;
+            }
+
+            int startCompare = task1.getStartDateTime().orElse(LocalDateTime.MIN)
+                    .compareTo(task2.getStartDateTime().orElse(LocalDateTime.MIN));
+            if (startCompare == 0) {
+                return 0;
+            }
+
+            return startCompare;
+        });
         baseTask1.setDurationInMinutes(10);
-        baseTask1.setStartDateTime(LocalDateTime.now().plusHours(3));
+        baseTask1.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(3));
         baseSubtask2.setDurationInMinutes(10);
-        baseSubtask2.setStartDateTime(LocalDateTime.now().plusHours(2));
+        baseSubtask2.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(2));
         baseSubtask3.setDurationInMinutes(10);
-        baseSubtask3.setStartDateTime(LocalDateTime.now().plusHours(1));
+        baseSubtask3.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(1));
         expectedSet.add(baseTask1);
         expectedSet.add(baseSubtask2);
         expectedSet.add(baseSubtask3);
@@ -747,29 +757,51 @@ abstract class TaskManagerTest<T extends TaskManager> {
     void isTimeIntersectBoth_Test() {
         //Given, expected true
         baseTask1.setDurationInMinutes(10);
-        baseTask1.setStartDateTime(LocalDateTime.now().plusMinutes(55));
+        baseTask1.setStartDateTime(LocalDateTime.now().withNano(0).plusMinutes(55));
         baseSubtask2.setDurationInMinutes(10);
-        baseSubtask2.setStartDateTime(LocalDateTime.now().plusHours(1));
+        baseSubtask2.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(1));
         //When, Then
         assertTrue(taskManager.isTimeIntersectBoth(baseTask1, baseSubtask2));
     }
 
     @Test
-    @DisplayName("Проверяем пересечение задачи по времени с приорететными задачами")
+    @DisplayName("Проверяем пересечение задачи по времени с приоритетными задачами")
     void isTimeIntersectWithOthers_Test() {
         //Given, expected true
         baseTask1.setDurationInMinutes(10);
-        baseTask1.setStartDateTime(LocalDateTime.now().plusHours(3));
+        baseTask1.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(3));
         baseSubtask2.setDurationInMinutes(10);
-        baseSubtask2.setStartDateTime(LocalDateTime.now().plusHours(2));
+        baseSubtask2.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(2));
         baseSubtask3.setDurationInMinutes(10);
-        baseSubtask3.setStartDateTime(LocalDateTime.now().plusHours(1));
+        baseSubtask3.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(1));
         taskManager.updateTask(baseTask1);
         taskManager.updateSubtask(baseSubtask2);
         taskManager.updateSubtask(baseSubtask3);
         baseTask2.setDurationInMinutes(10);
-        baseTask2.setStartDateTime(LocalDateTime.now().plusHours(1).plusMinutes(5));
+        baseTask2.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(1).plusMinutes(5));
         //When, Then
         assertTrue(taskManager.isTimeIntersectWithOthers(baseTask2));
     }
+
+    @Test
+    @DisplayName("Проверяем замену задачи (с новым временем) в приоритетных задачах")
+    void check_Replace_Task_In_Prioritized_With_New_Time_Test() {
+        //Given
+        baseTask1.setDurationInMinutes(10);
+        baseTask1.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(1));
+        baseTask2.setDurationInMinutes(10);
+        baseTask2.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(2));
+        taskManager.updateTask(baseTask1);
+        taskManager.updateTask(baseTask2);
+        System.out.println("\nПроверяем замену задачи (с новым временем) в приоритетных задачах");
+        System.out.println("before" + taskManager.getPrioritizedTasks());
+        //When
+        baseTask2.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(2).plusMinutes(5));
+        System.out.println("taskManager.updateTask(baseTask2):" + taskManager.updateTask(baseTask2));
+        Task newBaseTask2 = taskManager.getTaskForIdNumber(BASE_TASK_2_ID).get();
+        System.out.println("after" + taskManager.getPrioritizedTasks());
+        //Then
+        assertTrue(taskManager.getPrioritizedTasks().contains(newBaseTask2));
+    }
+
 }

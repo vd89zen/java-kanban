@@ -3,6 +3,7 @@ package ru.yandex.practicum.java.tasktracker.service;
 import ru.yandex.practicum.java.tasktracker.manage.ManagersUtil;
 import ru.yandex.practicum.java.tasktracker.task.*;
 import ru.yandex.practicum.java.tasktracker.utils.*;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -27,7 +28,19 @@ public class InMemoryTaskManager implements TaskManager {
         counterForIdNumber = 1;
         allIdInWork = new HashSet<>();
         isRestarted = false;
-        prioritizedTasks = new TreeSet<>(Comparator.comparing((AbstractTask task) -> task.getStartDateTime().get()));
+        prioritizedTasks = new TreeSet<>((task1, task2) -> {
+            if (task1.getIdNumber() == task2.getIdNumber()) {
+                return 0;
+            }
+
+            int startCompare = task1.getStartDateTime().orElse(LocalDateTime.MIN)
+                    .compareTo(task2.getStartDateTime().orElse(LocalDateTime.MIN));
+            if (startCompare == 0) {
+                return 0;
+            }
+
+            return startCompare;
+        });
     }
 
     private ResultOfOperation generateIdNumber() {
@@ -87,7 +100,9 @@ public class InMemoryTaskManager implements TaskManager {
 
         return prioritizedTasks.stream()
                 .anyMatch(prioritizedTask ->
-                        isTimeIntersectBoth(task, prioritizedTask));
+                        task.getIdNumber() != prioritizedTask.getIdNumber()
+                        ? isTimeIntersectBoth(task, prioritizedTask)
+                        : false);
     }
 
     @Override
@@ -110,7 +125,7 @@ public class InMemoryTaskManager implements TaskManager {
     public ResultOfOperation addTask(Task task) {
         if (task == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
-        } else if (task.getName() == null || task.getDescription() == null
+        } else if (task.getName().isEmpty() || task.getDescription().isEmpty()
                 || task.getStatusProgress() == null) {
             return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
         } else if (task.getIdNumber() < 0) {
@@ -181,7 +196,7 @@ public class InMemoryTaskManager implements TaskManager {
     public ResultOfOperation updateTask(Task task) {
         if (task == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
-        } else if (task.getName() == null || task.getDescription() == null
+        } else if (task.getName().isEmpty() || task.getDescription().isEmpty()
                 || task.getStatusProgress() == null) {
             return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
         } else if (tasks.isEmpty() || tasks.containsKey(task.getIdNumber()) == false) {
@@ -190,6 +205,7 @@ public class InMemoryTaskManager implements TaskManager {
             return ResultOfOperation.ERROR_INTERSECT_TIME;
         }
 
+        prioritizedTasks.remove(tasks.get(task.getIdNumber()));
         taskForWork = new Task(task);
         tasks.put(taskForWork.getIdNumber(), taskForWork);
         addToPriorityList(taskForWork);
@@ -370,7 +386,7 @@ public class InMemoryTaskManager implements TaskManager {
     public ResultOfOperation addSubtask(Subtask subtask) {
         if (subtask == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
-        } else if (subtask.getName() == null || subtask.getDescription() == null
+        } else if (subtask.getName().isEmpty() || subtask.getDescription().isEmpty()
                 || subtask.getStatusProgress() == null) {
             return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
         } else if (epics.isEmpty()) {
@@ -459,6 +475,7 @@ public class InMemoryTaskManager implements TaskManager {
         }
 
         int parentEpicIdNumber = subtasks.get(subtaskIdNumber).getParentEpicIdNumber();
+        prioritizedTasks.remove(subtasks.get(subtaskIdNumber));
         subtasks.remove(subtaskIdNumber);
         historyManager.removeRecord(subtaskIdNumber);
         allIdInWork.remove(subtaskIdNumber);
@@ -493,6 +510,7 @@ public class InMemoryTaskManager implements TaskManager {
             return ResultOfOperation.ERROR_INTERSECT_TIME;
         }
 
+        prioritizedTasks.remove(subtasks.get(subtaskIdNumber));
         subtasks.put(subtaskIdNumber, subtaskForWork);
         addToPriorityList(subtaskForWork);
         return epics.get(subtaskParentEpicIdNumber).updateSubtask(subtask);

@@ -134,6 +134,10 @@ public class Subtask extends AbstractTask {
         return ResultOfOperation.SUCCESS;
     }
 
+    public void resetStartDateTime() {
+        this.startDateTime = null;
+    }
+
     public ResultOfOperation setParentEpicIdNumber(int parentEpicIdNumber) {
         if (parentEpicIdNumber < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;

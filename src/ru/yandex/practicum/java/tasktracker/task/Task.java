@@ -87,6 +87,10 @@ public class Task extends AbstractTask {
         return ResultOfOperation.SUCCESS;
     }
 
+    public void resetStartDateTime() {
+        this.startDateTime = null;
+    }
+
     @Override
     public String toString() {
         String descriptionLength;
