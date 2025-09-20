@@ -6,7 +6,7 @@ import ru.yandex.practicum.java.tasktracker.task.Subtask;
 import ru.yandex.practicum.java.tasktracker.task.Task;
 import ru.yandex.practicum.java.tasktracker.utils.CommaSeparatedValuesCreateProcess;
 import ru.yandex.practicum.java.tasktracker.utils.ResultOfOperation;
-
+import java.util.ArrayList;
 import java.util.List;
 import java.nio.file.Files;
 import java.io.File;
@@ -17,8 +17,61 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
     private File file;
     private final CommaSeparatedValuesCreateProcess csvManager;
 
-    public static FileBackedTaskManager loadFromFile(File file) {
-        final byte HEADER_TYPE = 1;
+    public static FileBackedTaskManager loadFromFileUsingMethods(File file) {
+        final int HEADER_ID = 0;
+        final int HEADER_TYPE = 1;
+        if (Files.exists(file.toPath())) {
+            FileBackedTaskManager fileBackedTaskManager = new FileBackedTaskManager(file);
+            try {
+                List<String> stringsFromFile = Files.readAllLines(file.toPath());
+                ArrayList<Subtask> subtasksList = new ArrayList<>();
+                ResultOfOperation resultOfOperation = null;
+                for (String string : stringsFromFile) {
+                    String[] strings = string.split(",");
+                    switch (strings[HEADER_TYPE]) {
+                        case "TASK":
+                            resultOfOperation = fileBackedTaskManager
+                                    .addTask(fileBackedTaskManager.csvManager.getTaskFromStrings(strings));
+                            if (resultOfOperation != ResultOfOperation.SUCCESS) {
+                                throw new RuntimeException("Ошибка добавления TASK (id:" + strings[HEADER_ID] +
+                                        ") в базу менеджера: " + resultOfOperation);
+                            }
+                            break;
+                        case "EPIC":
+                            resultOfOperation = fileBackedTaskManager
+                                    .addEpic(fileBackedTaskManager.csvManager.getEpicFromStrings(strings));
+                            if (resultOfOperation != ResultOfOperation.SUCCESS) {
+                                throw new RuntimeException("Ошибка добавления EPIC (id:" + strings[HEADER_ID] +
+                                        ") в базу менеджера: " + resultOfOperation);
+                            }
+                            break;
+                        case "SUBTASK":
+                            subtasksList.add(fileBackedTaskManager.csvManager.getSubtaskFromStrings(strings));
+                            break;
+                        case "type":
+                            break;
+                        default:
+                            throw new IOException("Неверный порядок данных в файле");
+                    }
+                }
+                for (Subtask subtask : subtasksList) {
+                    resultOfOperation = fileBackedTaskManager.addSubtask(subtask);
+                    if (resultOfOperation != ResultOfOperation.SUCCESS) {
+                        throw new RuntimeException("Ошибка добавления SUBTASK (id:" + subtask.getIdNumber() +
+                                ") в базу менеджера: " + resultOfOperation);
+                    }
+                }
+            } catch (IOException exception) {
+                throw new RuntimeException(exception);
+            }
+            return fileBackedTaskManager;
+        } else {
+            return new FileBackedTaskManager(file);
+        }
+    }
+
+    public static FileBackedTaskManager loadFromFileDirectlyToMap(File file) {
+        final int HEADER_TYPE = 1;
         if (Files.exists(file.toPath())) {
             FileBackedTaskManager fileBackedTaskManager = new FileBackedTaskManager(file);
             try {
@@ -46,6 +99,11 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                         default:
                             throw new IOException("Неверный порядок данных в файле");
                     }
+                }
+
+                for (Subtask subtask : fileBackedTaskManager.subtasks.values()) {
+                    Epic parentEpic = fileBackedTaskManager.epics.get(subtask.getParentEpicIdNumber());
+                    parentEpic.addSubtask(subtask);
                 }
             } catch (IOException exception) {
                 throw new RuntimeException(exception);
@@ -94,7 +152,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
 
     @Override
     public ResultOfOperation addTask(Task task) {
-        final ResultOfOperation resultOfOperation = super.addTask(task);
+        ResultOfOperation resultOfOperation = super.addTask(task);
         if (resultOfOperation == ResultOfOperation.SUCCESS) {
             save();
         }
@@ -103,7 +161,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
 
     @Override
     public ResultOfOperation removeAllTasks() {
-        final ResultOfOperation resultOfOperation = super.removeAllTasks();
+        ResultOfOperation resultOfOperation = super.removeAllTasks();
         if (resultOfOperation == ResultOfOperation.SUCCESS) {
             save();
         }
@@ -112,7 +170,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
 
     @Override
     public ResultOfOperation updateTask(Task task) {
-        final ResultOfOperation resultOfOperation = super.updateTask(task);
+        ResultOfOperation resultOfOperation = super.updateTask(task);
         if (resultOfOperation == ResultOfOperation.SUCCESS) {
             save();
         }
@@ -120,8 +178,8 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
     }
 
     @Override
-    public ResultOfOperation removeTaskForIdNumber(Integer taskIdNumber) {
-        final ResultOfOperation resultOfOperation = super.removeTaskForIdNumber(taskIdNumber);
+    public ResultOfOperation removeTaskForIdNumber(int taskIdNumber) {
+        ResultOfOperation resultOfOperation = super.removeTaskForIdNumber(taskIdNumber);
         if (resultOfOperation == ResultOfOperation.SUCCESS) {
             save();
         }
@@ -130,7 +188,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
 
     @Override
     public ResultOfOperation addEpic(Epic epic) {
-        final ResultOfOperation resultOfOperation = super.addEpic(epic);
+        ResultOfOperation resultOfOperation = super.addEpic(epic);
         if (resultOfOperation == ResultOfOperation.SUCCESS) {
             save();
         }
@@ -138,8 +196,17 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
     }
 
     @Override
-    public ResultOfOperation updateEpic(Epic epic) {
-        final ResultOfOperation resultOfOperation = super.updateEpic(epic);
+    public ResultOfOperation updateEpicName(int epicIdNumber, String newEpicName) {
+        ResultOfOperation resultOfOperation = super.updateEpicName(epicIdNumber, newEpicName);
+        if (resultOfOperation == ResultOfOperation.SUCCESS) {
+            save();
+        }
+        return resultOfOperation;
+    }
+
+    @Override
+    public ResultOfOperation updateEpicDescription(int epicIdNumber, String newEpicDescription) {
+        ResultOfOperation resultOfOperation = super.updateEpicDescription(epicIdNumber, newEpicDescription);
         if (resultOfOperation == ResultOfOperation.SUCCESS) {
             save();
         }
@@ -148,7 +215,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
 
     @Override
     public ResultOfOperation removeAllEpics() {
-        final ResultOfOperation resultOfOperation = super.removeAllEpics();
+        ResultOfOperation resultOfOperation = super.removeAllEpics();
         if (resultOfOperation == ResultOfOperation.SUCCESS) {
             save();
         }
@@ -156,8 +223,8 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
     }
 
     @Override
-    public ResultOfOperation removeEpicForIdNumber(Integer epicIdNumber) {
-        final ResultOfOperation resultOfOperation = super.removeEpicForIdNumber(epicIdNumber);
+    public ResultOfOperation removeEpicForIdNumber(int epicIdNumber) {
+        ResultOfOperation resultOfOperation = super.removeEpicForIdNumber(epicIdNumber);
         if (resultOfOperation == ResultOfOperation.SUCCESS) {
             save();
         }
@@ -166,7 +233,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
 
     @Override
     public ResultOfOperation addSubtask(Subtask subtask) {
-        final ResultOfOperation resultOfOperation = super.addSubtask(subtask);
+        ResultOfOperation resultOfOperation = super.addSubtask(subtask);
         if (resultOfOperation == ResultOfOperation.SUCCESS) {
             save();
         }
@@ -175,7 +242,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
 
     @Override
     public ResultOfOperation removeAllSubtasks() {
-        final ResultOfOperation resultOfOperation = super.removeAllSubtasks();
+        ResultOfOperation resultOfOperation = super.removeAllSubtasks();
         if (resultOfOperation == ResultOfOperation.SUCCESS) {
             save();
         }
@@ -183,8 +250,8 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
     }
 
     @Override
-    public ResultOfOperation removeSubtaskForIdNumber(Integer subtaskIdNumber) {
-        final ResultOfOperation resultOfOperation = super.removeSubtaskForIdNumber(subtaskIdNumber);
+    public ResultOfOperation removeSubtaskForIdNumber(int subtaskIdNumber) {
+        ResultOfOperation resultOfOperation = super.removeSubtaskForIdNumber(subtaskIdNumber);
         if (resultOfOperation == ResultOfOperation.SUCCESS) {
             save();
         }
@@ -193,7 +260,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
 
     @Override
     public ResultOfOperation updateSubtask(Subtask subtask) {
-        final ResultOfOperation resultOfOperation = super.updateSubtask(subtask);
+        ResultOfOperation resultOfOperation = super.updateSubtask(subtask);
         if (resultOfOperation == ResultOfOperation.SUCCESS) {
             save();
         }

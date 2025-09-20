@@ -1,5 +1,6 @@
 package ru.yandex.practicum.java.tasktracker.utils;
 
+import ru.yandex.practicum.java.tasktracker.task.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Objects;
@@ -72,9 +73,7 @@ public class LinkedHashMapCustom {
             }
 
             result = 31 * result + Objects.hashCode(previousTaskIdNumber);
-
             result = 31 * result + Objects.hashCode(nextTaskIdNumber);
-
             return result;
         }
     }
@@ -103,7 +102,7 @@ public class LinkedHashMapCustom {
         if (task == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
         } else if (task.getName() == null || task.getDescription() == null
-                || task.getStatusProgress() == null || task.getIdNumber() == null) {
+                || task.getStatusProgress() == null) {
             return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
         } else if (task.getIdNumber() < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
@@ -127,10 +126,8 @@ public class LinkedHashMapCustom {
         return ResultOfOperation.SUCCESS;
     }
 
-    public ResultOfOperation removeEntry(Integer taskIdNumber) {
-        if (taskIdNumber == null) {
-            return ResultOfOperation.ERROR_OBJECT_NULL;
-        } else if (taskIdNumber < 0) {
+    public ResultOfOperation removeEntry(int taskIdNumber) {
+        if (taskIdNumber < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
         }
 
@@ -170,7 +167,17 @@ public class LinkedHashMapCustom {
         NodeCustom nodeForList = head;
 
         while (true) {
-            listForReturn.add(nodeForList.task);
+            switch (nodeForList.task.getTypeTask()) {
+                case TASK:
+                    listForReturn.add(new Task((Task) nodeForList.task));
+                    break;
+                case EPIC:
+                    listForReturn.add(new Epic((Epic) nodeForList.task));
+                    break;
+                case SUBTASK:
+                    listForReturn.add(new Subtask((Subtask) nodeForList.task));
+                    break;
+            }
             if (nodeForList.nextNode == null) {
                 return listForReturn;
             }

@@ -6,7 +6,7 @@ public interface HistoryManager {
 
     ResultOfOperation addRecord(AbstractTask task);
 
-    ResultOfOperation removeRecord(Integer idNumber);
+    ResultOfOperation removeRecord(int idNumber);
 
     ArrayList<AbstractTask> getHistory();
 }

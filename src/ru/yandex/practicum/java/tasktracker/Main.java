@@ -1,20 +1,15 @@
 package ru.yandex.practicum.java.tasktracker;
 
-import ru.yandex.practicum.java.tasktracker.service.FileBackedTaskManager;
-import ru.yandex.practicum.java.tasktracker.utils.DataForUserScenario;
-
+import ru.yandex.practicum.java.tasktracker.service.*;
+import ru.yandex.practicum.java.tasktracker.utils.*;
 import java.io.File;
 import java.io.IOException;
 
 public class Main {
     public static void main(String[] args) throws IOException {
         /*
-         * Дополнительное задание. Реализуем пользовательский сценарий.
-         * 1. Заведите несколько разных задач, эпиков и подзадач.
-         * 2. Создайте новый FileBackedTaskManager-менеджер из этого же файла.
-         * 3. Проверьте, что все задачи, эпики, подзадачи, которые были в старом менеджере, есть в новом.
+         *простое сравнение двух методов загрузки из файла
          */
-
         File tempFile = File.createTempFile("temptasks", ".csv");
 
         FileBackedTaskManager fileBackedTaskManager = new FileBackedTaskManager(tempFile);
@@ -25,7 +20,12 @@ public class Main {
         System.out.println(fileBackedTaskManager.getAllEpics());
         System.out.println(fileBackedTaskManager.getAllSubtasks());
         //2
-        FileBackedTaskManager fileBackedTaskManagerFromFile = FileBackedTaskManager.loadFromFile(tempFile);
+        //Время загрузки FileBackedTaskManager.loadFromFileUsingMethods - 20376700 nanoseconds
+        //Время загрузки FileBackedTaskManager.loadFromFileDirectlyToMap - 5025100 nanoseconds
+
+        //FileBackedTaskManager fileBackedTaskManagerFromFile = FileBackedTaskManager.loadFromFileUsingMethods(tempFile);
+        FileBackedTaskManager fileBackedTaskManagerFromFile = FileBackedTaskManager.loadFromFileDirectlyToMap(tempFile);
+
         //3
         System.out.println("\nДанные из Менеджера созданного из файла");
         System.out.println(fileBackedTaskManagerFromFile.getAllTasks());

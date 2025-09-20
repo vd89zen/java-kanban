@@ -4,7 +4,6 @@ import ru.yandex.practicum.java.tasktracker.utils.AbstractTask;
 import ru.yandex.practicum.java.tasktracker.utils.HistoryManager;
 import ru.yandex.practicum.java.tasktracker.utils.LinkedHashMapCustom;
 import ru.yandex.practicum.java.tasktracker.utils.ResultOfOperation;
-
 import java.util.ArrayList;
 
 public class InMemoryHistoryManager implements HistoryManager {
@@ -26,10 +25,8 @@ public class InMemoryHistoryManager implements HistoryManager {
     }
 
     @Override
-    public ResultOfOperation removeRecord(Integer idNumber) {
-        if (idNumber == null) {
-            return ResultOfOperation.ERROR_OBJECT_NULL;
-        } else if (idNumber < 0) {
+    public ResultOfOperation removeRecord(int idNumber) {
+        if (idNumber < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
         }
 
