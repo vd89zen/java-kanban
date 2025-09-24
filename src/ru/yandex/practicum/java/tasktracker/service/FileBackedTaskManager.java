@@ -16,12 +16,14 @@ import java.io.IOException;
 public class FileBackedTaskManager extends InMemoryTaskManager {
     private File file;
     private final CommaSeparatedValuesCreateProcess csvManager;
+    private static boolean isLoadFromFile;
 
     public static FileBackedTaskManager loadFromFileUsingMethods(File file) {
         final int HEADER_ID = 0;
         final int HEADER_TYPE = 1;
         if (Files.exists(file.toPath())) {
             FileBackedTaskManager fileBackedTaskManager = new FileBackedTaskManager(file);
+            isLoadFromFile =true;
             try {
                 List<String> stringsFromFile = Files.readAllLines(file.toPath());
                 ArrayList<Subtask> subtasksList = new ArrayList<>();
@@ -33,6 +35,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                             resultOfOperation = fileBackedTaskManager
                                     .addTask(fileBackedTaskManager.csvManager.getTaskFromStrings(strings));
                             if (resultOfOperation != ResultOfOperation.SUCCESS) {
+                                isLoadFromFile = false;
                                 throw new RuntimeException("Ошибка добавления TASK (id:" + strings[HEADER_ID] +
                                         ") в базу менеджера: " + resultOfOperation);
                             }
@@ -41,6 +44,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                             resultOfOperation = fileBackedTaskManager
                                     .addEpic(fileBackedTaskManager.csvManager.getEpicFromStrings(strings));
                             if (resultOfOperation != ResultOfOperation.SUCCESS) {
+                                isLoadFromFile = false;
                                 throw new RuntimeException("Ошибка добавления EPIC (id:" + strings[HEADER_ID] +
                                         ") в базу менеджера: " + resultOfOperation);
                             }
@@ -51,19 +55,23 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                         case "type":
                             break;
                         default:
+                            isLoadFromFile = false;
                             throw new IOException("Неверный порядок данных в файле");
                     }
                 }
                 for (Subtask subtask : subtasksList) {
                     resultOfOperation = fileBackedTaskManager.addSubtask(subtask);
                     if (resultOfOperation != ResultOfOperation.SUCCESS) {
+                        isLoadFromFile = false;
                         throw new RuntimeException("Ошибка добавления SUBTASK (id:" + subtask.getIdNumber() +
                                 ") в базу менеджера: " + resultOfOperation);
                     }
                 }
             } catch (IOException exception) {
+                isLoadFromFile = false;
                 throw new RuntimeException(exception);
             }
+            isLoadFromFile = false;
             return fileBackedTaskManager;
         } else {
             return new FileBackedTaskManager(file);
@@ -118,9 +126,14 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
         super();
         this.file = file;
         csvManager = new CommaSeparatedValuesCreateProcess();
+        isLoadFromFile = false;
     }
 
     private void save() {
+        if (isLoadFromFile) {
+            return;
+        }
+
         try {
             Files.createDirectories(file.toPath().getParent());
 
