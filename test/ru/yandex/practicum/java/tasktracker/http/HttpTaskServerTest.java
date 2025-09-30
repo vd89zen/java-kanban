@@ -172,7 +172,7 @@ class HttpTaskServerTest {
             //Then
             assertEquals(expectedStatusCode, response.statusCode());
 
-            TypeToken<ArrayList<Task>> collectionType = new TypeToken<ArrayList<Task>>(){};
+            TypeToken<ArrayList<Task>> collectionType = new TypeToken<>(){};
             ArrayList<Task> tasksFromServer = gson.fromJson(response.body(), collectionType);
             int actualSizeTasksList = tasksFromServer.size();
 
@@ -454,7 +454,7 @@ class HttpTaskServerTest {
             //Then
             assertEquals(expectedStatusCode, response.statusCode());
 
-            TypeToken<ArrayList<Subtask>> collectionType = new TypeToken<ArrayList<Subtask>>(){};
+            TypeToken<ArrayList<Subtask>> collectionType = new TypeToken<>(){};
             ArrayList<Subtask> subtasksFromServer = gson.fromJson(response.body(), collectionType);
             int actualSizeSubtasksList = subtasksFromServer.size();
 
@@ -697,7 +697,7 @@ class HttpTaskServerTest {
             //Then
             assertEquals(expectedStatusCode, response.statusCode());
 
-            TypeToken<ArrayList<Epic>> collectionType = new TypeToken<ArrayList<Epic>>(){};
+            TypeToken<ArrayList<Epic>> collectionType = new TypeToken<>(){};
             ArrayList<Epic> epicsFromServer = gson.fromJson(response.body(), collectionType);
             int actualSizeEpicsList = epicsFromServer.size();
 
@@ -758,7 +758,7 @@ class HttpTaskServerTest {
             //Then
             assertEquals(expectedStatusCode, response.statusCode());
 
-            TypeToken<ArrayList<Subtask>> collectionType = new TypeToken<ArrayList<Subtask>>(){};
+            TypeToken<ArrayList<Subtask>> collectionType = new TypeToken<>(){};
             ArrayList<Subtask> subtasksFromServer = gson.fromJson(response.body(), collectionType);
             int actualSizeSubtasksList = subtasksFromServer.size();
 

@@ -237,7 +237,7 @@ public class InMemoryTaskManager implements TaskManager {
     public ResultOfOperation addEpic(Epic epic) {
         if (epic == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
-        } else if (epic.getName() == null || epic.getDescription() == null
+        } else if (epic.getName().isEmpty() || epic.getDescription().isEmpty()
                 || epic.getStatusProgress() == null) {
             return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
         } else if (epic.getIdNumber() < 0) {
@@ -499,7 +499,7 @@ public class InMemoryTaskManager implements TaskManager {
     public ResultOfOperation updateSubtask(Subtask subtask) {
         if (subtask == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
-        } else if (subtask.getName() == null || subtask.getDescription() == null
+        } else if (subtask.getName().isEmpty() || subtask.getDescription().isEmpty()
                 || subtask.getStatusProgress() == null) {
             return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
         }

@@ -8,7 +8,7 @@ public enum HttpResponseCode {
     NOT_ACCEPTABLE (406),
     INTERNAL_SERVER_ERROR (500);
 
-    private int code;
+    private final int code;
     HttpResponseCode(int code){
         this.code = code;
     }
