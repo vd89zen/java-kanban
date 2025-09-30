@@ -3,7 +3,10 @@ package ru.yandex.practicum.java.tasktracker.manage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import ru.yandex.practicum.java.tasktracker.utils.*;
+import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
+import ru.yandex.practicum.java.tasktracker.utils.enums.StatusProgress;
+import ru.yandex.practicum.java.tasktracker.utils.interfaces.HistoryManager;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("Тесты для InMemoryHistoryManager.")

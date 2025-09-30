@@ -1,6 +1,10 @@
 package ru.yandex.practicum.java.tasktracker.utils;
 
 import ru.yandex.practicum.java.tasktracker.task.*;
+import ru.yandex.practicum.java.tasktracker.utils.enums.StatusProgress;
+import ru.yandex.practicum.java.tasktracker.utils.enums.TypesTasks;
+
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Optional;
@@ -61,7 +65,7 @@ public class CommaSeparatedValuesCreateProcess {
         if (startTask.isPresent()) {
             startDateTime = startTask.get().toString();
         } else {
-            startDateTime = "null";
+            startDateTime = "EMPTY";
         }
 
         Optional<LocalDateTime> endTask = task.getEndDateTime();
@@ -69,7 +73,7 @@ public class CommaSeparatedValuesCreateProcess {
         if (endTask.isPresent()) {
             endDateTime = endTask.get().toString();
         } else {
-            endDateTime = "null";
+            endDateTime = "EMPTY";
         }
 
         return String.join(",", id, type, task.getName().get(), task.getDescription().get(),
@@ -90,7 +94,7 @@ public class CommaSeparatedValuesCreateProcess {
         if (startSubtask.isPresent()) {
             startDateTime = startSubtask.get().toString();
         } else {
-            startDateTime = "null";
+            startDateTime = "EMPTY";
         }
 
         Optional<LocalDateTime> endSubtask = subtask.getEndDateTime();
@@ -98,7 +102,7 @@ public class CommaSeparatedValuesCreateProcess {
         if (endSubtask.isPresent()) {
             endDateTime = endSubtask.get().toString();
         } else {
-            endDateTime = "null";
+            endDateTime = "EMPTY";
         }
 
         return String.join(",", id, type, subtask.getName().get(), subtask.getDescription().get(),
@@ -113,31 +117,35 @@ public class CommaSeparatedValuesCreateProcess {
         String parentEpic = "SKIP";
 
         String childSubtasks;
+        String durationInMinutes;
+        String startDateTime;
+        String endDateTime;
         Optional<ArrayList<Integer>> subtasks = epic.getSubtasksIdNumber();
         if (subtasks.isEmpty()) {
             childSubtasks = "EMPTY";
+            durationInMinutes = "0";
+            startDateTime = "EMPTY";
+            endDateTime = "EMPTY";
         } else {
             childSubtasks = subtasks.get().stream()
                     .map(String::valueOf)
                     .collect(Collectors.joining("|"));
-        }
 
-        String durationInMinutes = String.valueOf(epic.getDurationInMinutes());
+            durationInMinutes = String.valueOf(epic.getDurationInMinutes());
 
-        Optional<LocalDateTime> startEpic = epic.getStartDateTime();
-        String startDateTime;
-        if (startEpic.isPresent()) {
-            startDateTime = startEpic.get().toString();
-        } else {
-            startDateTime = "null";
-        }
+            Optional<LocalDateTime> startEpic = epic.getStartDateTime();
+            if (startEpic.isPresent()) {
+                startDateTime = startEpic.get().toString();
+            } else {
+                startDateTime = "EMPTY";
+            }
 
-        Optional<LocalDateTime> endEpic = epic.getEndDateTime();
-        String endDateTime;
-        if (endEpic.isPresent()) {
-            endDateTime = endEpic.get().toString();
-        } else {
-            endDateTime = "null";
+            Optional<LocalDateTime> endEpic = epic.getEndDateTime();
+            if (endEpic.isPresent()) {
+                endDateTime = endEpic.get().toString();
+            } else {
+                endDateTime = "EMPTY";
+            }
         }
 
         return String.join(",", id, type, epic.getName().get(), epic.getDescription().get(), statusProgress,
@@ -215,7 +223,7 @@ public class CommaSeparatedValuesCreateProcess {
         }
 
         durationInMinutes = Long.valueOf(fields[headerDurationInMinutes]);
-        if (fields[headerStartDateTime].equals("null")) {
+        if (fields[headerStartDateTime].equals("EMPTY")) {
             startDateTime = null;
         } else {
             startDateTime = LocalDateTime.parse(fields[headerStartDateTime]);

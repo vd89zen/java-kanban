@@ -1,14 +1,15 @@
-package ru.yandex.practicum.java.tasktracker.utils;
+package ru.yandex.practicum.java.tasktracker.utils.interfaces;
 
 import ru.yandex.practicum.java.tasktracker.task.Epic;
 import ru.yandex.practicum.java.tasktracker.task.Subtask;
 import ru.yandex.practicum.java.tasktracker.task.Task;
+import ru.yandex.practicum.java.tasktracker.utils.AbstractTask;
+import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
 import java.util.ArrayList;
 import java.util.Optional;
-import java.util.TreeSet;
 
 public interface TaskManager {
-    TreeSet<AbstractTask> getPrioritizedTasks();
+    ArrayList<AbstractTask> getPrioritizedTasks();
 
     boolean isTimeIntersectBoth(AbstractTask taskOne, AbstractTask taskTwo);
 
@@ -21,9 +22,9 @@ public interface TaskManager {
     //TASK
     ResultOfOperation addTask(Task task);
 
-    Optional<Task> getTaskForIdNumber(int taskIdNumber);
+    Optional<Task> getTaskByIdNumber(int taskIdNumber);
 
-    ResultOfOperation removeTaskForIdNumber(int taskIdNumber);
+    ResultOfOperation removeTaskByIdNumber(int taskIdNumber);
 
     ResultOfOperation updateTask(Task task);
 
@@ -34,9 +35,9 @@ public interface TaskManager {
     //EPIC
     ResultOfOperation addEpic(Epic epic);
 
-    Optional<Epic> getEpicForIdNumber(int epicIdNumber);
+    Optional<Epic> getEpicByIdNumber(int epicIdNumber);
 
-    ResultOfOperation removeEpicForIdNumber(int epicIdNumber);
+    ResultOfOperation removeEpicByIdNumber(int epicIdNumber);
 
     ResultOfOperation updateEpicName(int epicIdNumber, String newEpicName);
 
@@ -51,9 +52,9 @@ public interface TaskManager {
     //SUBTASK
     ResultOfOperation addSubtask(Subtask subtask);
 
-    Optional<Subtask> getSubtaskForIdNumber(int subtaskIdNumber);
+    Optional<Subtask> getSubtaskByIdNumber(int subtaskIdNumber);
 
-    ResultOfOperation removeSubtaskForIdNumber(int subtaskIdNumber);
+    ResultOfOperation removeSubtaskByIdNumber(int subtaskIdNumber);
 
     ResultOfOperation updateSubtask(Subtask subtask);
 

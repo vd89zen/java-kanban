@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 import ru.yandex.practicum.java.tasktracker.exceptions.ManagerSaveException;
 import ru.yandex.practicum.java.tasktracker.service.FileBackedTaskManager;
 import ru.yandex.practicum.java.tasktracker.task.Task;
-import ru.yandex.practicum.java.tasktracker.utils.StatusProgress;
+import ru.yandex.practicum.java.tasktracker.utils.enums.StatusProgress;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;

@@ -3,6 +3,10 @@ package ru.yandex.practicum.java.tasktracker.service;
 import ru.yandex.practicum.java.tasktracker.manage.ManagersUtil;
 import ru.yandex.practicum.java.tasktracker.task.*;
 import ru.yandex.practicum.java.tasktracker.utils.*;
+import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
+import ru.yandex.practicum.java.tasktracker.utils.interfaces.HistoryManager;
+import ru.yandex.practicum.java.tasktracker.utils.interfaces.TaskManager;
+
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -106,8 +110,8 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     @Override
-    public TreeSet<AbstractTask> getPrioritizedTasks() {
-        return prioritizedTasks;
+    public ArrayList<AbstractTask> getPrioritizedTasks() {
+        return new ArrayList<>(prioritizedTasks);
     }
 
     @Override
@@ -184,7 +188,7 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     @Override
-    public Optional<Task> getTaskForIdNumber(int taskIdNumber) {
+    public Optional<Task> getTaskByIdNumber(int taskIdNumber) {
         if (taskIdNumber < 0 || tasks.isEmpty() || tasks.containsKey(taskIdNumber) == false) {
             return Optional.empty();
         }
@@ -214,7 +218,7 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     @Override
-    public ResultOfOperation removeTaskForIdNumber(int taskIdNumber) {
+    public ResultOfOperation removeTaskByIdNumber(int taskIdNumber) {
         if (taskIdNumber < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
         } else if (tasks.isEmpty() || tasks.containsKey(taskIdNumber) == false) {
@@ -244,15 +248,20 @@ public class InMemoryTaskManager implements TaskManager {
             return ResultOfOperation.ERROR_SUBTASKS_NOT_EMPTY;
         }
 
-        epicForWork = new Epic(epic);
-
-        if (epicForWork.getIdNumber() == 0) {
+        if (epic.getIdNumber() == 0) {
+            if (epic.getDurationInMinutes() != 0 || epic.getStartDateTime().isPresent()
+                    || epic.getEndDateTime().isPresent()) {
+                return ResultOfOperation.ERROR_OBJECT_ILLEGAL;
+            }
+            epicForWork = new Epic(epic.getName().get(), epic.getDescription().get());
             if (generateIdNumber() == ResultOfOperation.SUCCESS) {
                 epicForWork.setIdNumber(counterForIdNumber);
                 epic.setIdNumber(counterForIdNumber);
             } else {
                 return ResultOfOperation.ERROR_NO_AVAILABLE_ID;
             }
+        } else {
+            epicForWork = new Epic(epic);
         }
 
         epics.put(epicForWork.getIdNumber(), epicForWork);
@@ -349,7 +358,7 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     @Override
-    public Optional<Epic> getEpicForIdNumber(int epicIdNumber) {
+    public Optional<Epic> getEpicByIdNumber(int epicIdNumber) {
         if (epicIdNumber < 0 || epics.isEmpty() || epics.containsKey(epicIdNumber) == false) {
             return Optional.empty();
         }
@@ -358,7 +367,7 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     @Override
-    public ResultOfOperation removeEpicForIdNumber(int epicIdNumber) {
+    public ResultOfOperation removeEpicByIdNumber(int epicIdNumber) {
         if (epicIdNumber < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
         } else if (epics.isEmpty() || epics.containsKey(epicIdNumber) == false) {
@@ -456,7 +465,7 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     @Override
-    public Optional<Subtask> getSubtaskForIdNumber(int subtaskIdNumber) {
+    public Optional<Subtask> getSubtaskByIdNumber(int subtaskIdNumber) {
         if (subtaskIdNumber < 0 || epics.isEmpty() || subtasks.isEmpty()
                 || subtasks.containsKey(subtaskIdNumber) == false) {
             return Optional.empty();
@@ -467,11 +476,11 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     @Override
-    public ResultOfOperation removeSubtaskForIdNumber(int subtaskIdNumber) {
+    public ResultOfOperation removeSubtaskByIdNumber(int subtaskIdNumber) {
         if (subtaskIdNumber < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
         } else if (epics.isEmpty() || subtasks.isEmpty() || subtasks.containsKey(subtaskIdNumber) == false) {
-            return ResultOfOperation.ERROR_SUBTASK_NOT_FOUND;
+            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
         }
 
         int parentEpicIdNumber = subtasks.get(subtaskIdNumber).getParentEpicIdNumber();
@@ -502,7 +511,7 @@ public class InMemoryTaskManager implements TaskManager {
         if (subtaskIdNumber < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
         } else if (epics.isEmpty() || subtasks.isEmpty() || subtasks.containsKey(subtaskIdNumber) == false) {
-            return ResultOfOperation.ERROR_SUBTASK_NOT_FOUND;
+            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
         } else if (epics.containsKey(subtaskParentEpicIdNumber) == false
                 || subtasks.get(subtaskIdNumber).getParentEpicIdNumber() != subtaskParentEpicIdNumber) {
             return ResultOfOperation.ERROR_MISMATCH_PARENT_ID;
