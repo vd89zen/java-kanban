@@ -23,7 +23,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
         final int HEADER_TYPE = 1;
         if (Files.exists(file.toPath())) {
             FileBackedTaskManager fileBackedTaskManager = new FileBackedTaskManager(file);
-            isLoadFromFile =true;
+            isLoadFromFile = true;
             try {
                 List<String> stringsFromFile = Files.readAllLines(file.toPath());
                 ArrayList<Subtask> subtasksList = new ArrayList<>();
