@@ -1,4 +1,4 @@
-package ru.yandex.practicum.java.tasktracker.utils.interfaces;
+package ru.yandex.practicum.java.tasktracker.service.interfaces;
 
 import ru.yandex.practicum.java.tasktracker.task.Epic;
 import ru.yandex.practicum.java.tasktracker.task.Subtask;
@@ -6,7 +6,6 @@ import ru.yandex.practicum.java.tasktracker.task.Task;
 import ru.yandex.practicum.java.tasktracker.utils.AbstractTask;
 import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
 import java.util.ArrayList;
-import java.util.Optional;
 
 public interface TaskManager {
     ArrayList<AbstractTask> getPrioritizedTasks();
@@ -22,20 +21,20 @@ public interface TaskManager {
     //TASK
     ResultOfOperation addTask(Task task);
 
-    Optional<Task> getTaskByIdNumber(int taskIdNumber);
+    Task getTaskByIdNumber(int taskIdNumber);
 
     ResultOfOperation removeTaskByIdNumber(int taskIdNumber);
 
     ResultOfOperation updateTask(Task task);
 
-    Optional<ArrayList<Task>> getAllTasks();
+    ArrayList<Task> getAllTasks();
 
     ResultOfOperation removeAllTasks();
 
     //EPIC
     ResultOfOperation addEpic(Epic epic);
 
-    Optional<Epic> getEpicByIdNumber(int epicIdNumber);
+    Epic getEpicByIdNumber(int epicIdNumber);
 
     ResultOfOperation removeEpicByIdNumber(int epicIdNumber);
 
@@ -43,22 +42,22 @@ public interface TaskManager {
 
     ResultOfOperation updateEpicDescription(int epicIdNumber, String newEpicDescription);
 
-    Optional<ArrayList<Subtask>> getAllSubtasksFromEpic(int epicID);
+    ArrayList<Subtask> getAllSubtasksFromEpic(int epicID);
 
-    Optional<ArrayList<Epic>> getAllEpics();
+    ArrayList<Epic> getAllEpics();
 
     ResultOfOperation removeAllEpics();
 
     //SUBTASK
     ResultOfOperation addSubtask(Subtask subtask);
 
-    Optional<Subtask> getSubtaskByIdNumber(int subtaskIdNumber);
+    Subtask getSubtaskByIdNumber(int subtaskIdNumber);
 
     ResultOfOperation removeSubtaskByIdNumber(int subtaskIdNumber);
 
     ResultOfOperation updateSubtask(Subtask subtask);
 
-    Optional<ArrayList<Subtask>> getAllSubtasks();
+    ArrayList<Subtask> getAllSubtasks();
 
     ResultOfOperation removeAllSubtasks();
 

@@ -1,7 +1,7 @@
 package ru.yandex.practicum.java.tasktracker.service;
 
 import ru.yandex.practicum.java.tasktracker.utils.AbstractTask;
-import ru.yandex.practicum.java.tasktracker.utils.interfaces.HistoryManager;
+import ru.yandex.practicum.java.tasktracker.service.interfaces.HistoryManager;
 import ru.yandex.practicum.java.tasktracker.utils.LinkedHashMapCustom;
 import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
 import java.util.ArrayList;

@@ -8,7 +8,7 @@ import ru.yandex.practicum.java.tasktracker.utils.AbstractTask;
 import ru.yandex.practicum.java.tasktracker.utils.TextForGson;
 import ru.yandex.practicum.java.tasktracker.utils.enums.StatusProgress;
 import ru.yandex.practicum.java.tasktracker.utils.gson.*;
-import ru.yandex.practicum.java.tasktracker.utils.interfaces.TaskManager;
+import ru.yandex.practicum.java.tasktracker.service.interfaces.TaskManager;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -17,7 +17,6 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Optional;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -59,7 +58,6 @@ class HttpTaskServerTest {
         void endpointTasks_Delete_Task_Test() throws IOException, InterruptedException {
             //Given
             int expectedStatusCode = 200;
-            Optional<Task> expectedTask = Optional.empty();
 
             Task task = new Task("task", "test task", StatusProgress.NEW, 10,
                     LocalDateTime.now().withNano(0));
@@ -76,10 +74,7 @@ class HttpTaskServerTest {
             //Then
             System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
-
-            Optional<Task> actualTask = taskManager.getTaskByIdNumber(task.getIdNumber());
-
-            assertEquals(expectedTask, actualTask, "Задача в менеджере не удалилась");
+            assertThrows(RuntimeException.class, () -> taskManager.getTaskByIdNumber(task.getIdNumber()));
         }
 
         @Test
@@ -106,11 +101,10 @@ class HttpTaskServerTest {
             System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
 
-            Optional<ArrayList<Task>> tasksFromManager = taskManager.getAllTasks();
-            String actualTaskDescription = tasksFromManager.get().get(0).getDescription().get();
-            int actualSizeTasksList = tasksFromManager.get().size();
+            ArrayList<Task> tasksFromManager = taskManager.getAllTasks();
+            String actualTaskDescription = tasksFromManager.get(0).getDescription().get();
+            int actualSizeTasksList = tasksFromManager.size();
 
-            assertTrue(tasksFromManager.isPresent(), "Задачи не возвращаются");
             assertEquals(expectedSizeTasksList, actualSizeTasksList, "Неверное количество задач");
             assertEquals(expectedTaskDescription, actualTaskDescription, "Возвращаемая задача не соответствует заданной");
         }
@@ -141,7 +135,7 @@ class HttpTaskServerTest {
             System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
 
-            Task tasksFromManager = taskManager.getTaskByIdNumber(task.getIdNumber()).get();
+            Task tasksFromManager = taskManager.getTaskByIdNumber(task.getIdNumber());
             StatusProgress actualStatusProgress = tasksFromManager.getStatusProgress();
 
             assertEquals(expectedStatusProgress, actualStatusProgress, "Задача в менеджере не обновилась");
@@ -330,7 +324,6 @@ class HttpTaskServerTest {
         void endpointSubtasks_Delete_Subtask_Test() throws IOException, InterruptedException {
             //Given
             int expectedStatusCode = 200;
-            Optional<Subtask> expectedSubtask = Optional.empty();
 
             Epic epic = new Epic("epic", "epic");
             taskManager.addEpic(epic);
@@ -349,10 +342,7 @@ class HttpTaskServerTest {
             //Then
             System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
-
-            Optional<Subtask> actualSubtask = taskManager.getSubtaskByIdNumber(subtask.getIdNumber());
-
-            assertEquals(expectedSubtask, actualSubtask, "Задача в менеджере не удалилась");
+            assertThrows(RuntimeException.class, () -> taskManager.getSubtaskByIdNumber(subtask.getIdNumber()));
         }
 
         @Test
@@ -383,11 +373,10 @@ class HttpTaskServerTest {
             System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
 
-            Optional<ArrayList<Subtask>> subtasksFromManager = taskManager.getAllSubtasks();
-            String actualSubtaskDescription = subtasksFromManager.get().get(0).getDescription().get();
-            int actualSizeSubtasksList = subtasksFromManager.get().size();
+            ArrayList<Subtask> subtasksFromManager = taskManager.getAllSubtasks();
+            String actualSubtaskDescription = subtasksFromManager.get(0).getDescription().get();
+            int actualSizeSubtasksList = subtasksFromManager.size();
 
-            assertTrue(subtasksFromManager.isPresent(), "Задачи не возвращаются");
             assertEquals(expectedSizeSubtasksList, actualSizeSubtasksList, "Неверное количество задач");
             assertEquals(expectedSubtaskDescription, actualSubtaskDescription, "Возвращаемая задача не соответствует заданной");
         }
@@ -421,7 +410,7 @@ class HttpTaskServerTest {
             System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
 
-            Subtask subtasksFromManager = taskManager.getSubtaskByIdNumber(subtask.getIdNumber()).get();
+            Subtask subtasksFromManager = taskManager.getSubtaskByIdNumber(subtask.getIdNumber());
             StatusProgress actualStatusProgress = subtasksFromManager.getStatusProgress();
 
             assertEquals(expectedStatusProgress, actualStatusProgress, "Задача в менеджере не обновилась");
@@ -618,7 +607,6 @@ class HttpTaskServerTest {
         void endpointEpics_Delete_Epic_Test() throws IOException, InterruptedException {
             //Given
             int expectedStatusCode = 200;
-            Optional<Epic> expectedEpic = Optional.empty();
 
             Epic epic = new Epic("epic", "epic");
             taskManager.addEpic(epic);
@@ -634,10 +622,7 @@ class HttpTaskServerTest {
             //Then
             System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
-
-            Optional<Epic> actualEpic = taskManager.getEpicByIdNumber(epic.getIdNumber());
-
-            assertEquals(expectedEpic, actualEpic, "Задача в менеджере не удалилась");
+            assertThrows(RuntimeException.class, () -> taskManager.getEpicByIdNumber(epic.getIdNumber()));
         }
 
         @Test
@@ -665,11 +650,10 @@ class HttpTaskServerTest {
             System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
 
-            Optional<ArrayList<Epic>> epicsFromManager = taskManager.getAllEpics();
-            String actualEpicDescription = epicsFromManager.get().get(0).getDescription().get();
-            int actualSizeEpicsList = epicsFromManager.get().size();
+            ArrayList<Epic> epicsFromManager = taskManager.getAllEpics();
+            String actualEpicDescription = epicsFromManager.get(0).getDescription().get();
+            int actualSizeEpicsList = epicsFromManager.size();
 
-            assertTrue(epicsFromManager.isPresent(), "Задачи не возвращаются");
             assertEquals(expectedSizeEpicsList, actualSizeEpicsList, "Неверное количество задач");
             assertEquals(expectedEpicDescription, actualEpicDescription, "Возвращаемая задача не соответствует заданной");
         }

@@ -2,16 +2,15 @@ package ru.yandex.practicum.java.tasktracker.http.handler;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
+import ru.yandex.practicum.java.tasktracker.exceptions.BadRequestException;
 import ru.yandex.practicum.java.tasktracker.exceptions.ManagerSaveException;
+import ru.yandex.practicum.java.tasktracker.exceptions.NotFoundException;
 import ru.yandex.practicum.java.tasktracker.task.Epic;
-import ru.yandex.practicum.java.tasktracker.task.Subtask;
 import ru.yandex.practicum.java.tasktracker.utils.TextForGson;
 import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
-import ru.yandex.practicum.java.tasktracker.utils.interfaces.TaskManager;
+import ru.yandex.practicum.java.tasktracker.service.interfaces.TaskManager;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
 
@@ -21,41 +20,29 @@ public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
 
     @Override
     public void handle(HttpExchange httpExchange) throws IOException {
-        ResultOfOperation resultOfOperation = null;
+        ResultOfOperation resultOfOperation;
         TextForGson textForGson = new TextForGson();
         String requestMethod = httpExchange.getRequestMethod();
         String[] splitPath = httpExchange.getRequestURI().getPath().split("/");
+        textForGson.setRequest(requestMethod + " " + httpExchange.getRequestURI());
         try {
             if (requestMethod.equals("DELETE")) {
                 if (splitPath.length == 3) {
+                    int id;
                     try {
-                        int id = Integer.valueOf(splitPath[2]);
-                        resultOfOperation = taskManager.removeEpicByIdNumber(id);
-
-                        if (resultOfOperation == ResultOfOperation.SUCCESS) {
-                            textForGson.setDone("delete");
-                            textForGson.setTaskType("epic");
-                            textForGson.setTaskIdNumber(id);
-                            sendText(httpExchange, gson.toJson(textForGson));
-                        } else {
-                            textForGson.setRequest(requestMethod + " " + httpExchange.getRequestURI());
-                            textForGson.setDetail(resultOfOperation.name());
-                            switch (resultOfOperation) {
-                                case ERROR_OBJECT_NOT_FOUND:
-                                    sendNotFound(httpExchange, gson.toJson(textForGson));
-                                case ERROR_ID_LESS_ZERO:
-                                    sendBadRequest(httpExchange, gson.toJson(textForGson));
-                            }
-                        }
-                    } catch (NumberFormatException exception) {
-                        textForGson.setRequest(requestMethod + " " + httpExchange.getRequestURI());
-                        textForGson.setDetail("The ID number format is incorrect: it must be a positive number.");
-                        sendBadRequest(httpExchange, gson.toJson(textForGson));
+                        id = Integer.valueOf(splitPath[2]);
+                    } catch (NumberFormatException numberFormatException) {
+                        throw new BadRequestException("The ID number format is incorrect: it must be a positive number.");
                     }
+
+                    taskManager.removeEpicByIdNumber(id);
+                    textForGson.setRequest(null);
+                    textForGson.setDone("delete");
+                    textForGson.setTaskType("epic");
+                    textForGson.setTaskIdNumber(id);
+                    sendText(httpExchange, gson.toJson(textForGson));
                 } else {
-                    textForGson.setRequest(requestMethod + " " + httpExchange.getRequestURI());
-                    textForGson.setDetail("For DELETE path must be '/epics/{id}'");
-                    sendBadRequest(httpExchange, gson.toJson(textForGson));
+                    throw new BadRequestException("For DELETE path must be '/epics/{id}'");
                 }
                 return;
             }
@@ -63,25 +50,19 @@ public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
             if (requestMethod.equals("POST")) {
                 List<String> contentTypeValues = httpExchange.getRequestHeaders().get("Content-type");
                 if ((contentTypeValues == null) || (contentTypeValues.contains("application/json") == false)) {
-                    textForGson.setDetail("'Content-type' must be application/json");
-                    sendBadRequest(httpExchange, gson.toJson(textForGson));
-                    return;
+                    throw new BadRequestException("'Content-type' must be application/json");
                 }
 
                 String requestBody = new String(httpExchange.getRequestBody().readAllBytes(), DEFAULT_CHARSET);
                 if (requestBody.isEmpty()) {
-                    textForGson.setDetail("Request Body is empty: there is no data to add");
-                    sendBadRequest(httpExchange, gson.toJson(textForGson));
-                    return;
+                    throw new BadRequestException("Request Body is empty: there is no data to add");
                 }
 
-                Epic taskFromJson = null;
+                Epic taskFromJson;
                 try {
                     taskFromJson = gson.fromJson(requestBody, Epic.class);
                 } catch (Exception exception) {
-                    textForGson.setDetail("There is incorrect format JSON data to add: " + exception);
-                    sendBadRequest(httpExchange, gson.toJson(textForGson));
-                    return;
+                    throw new BadRequestException("There is incorrect format JSON data to add: " + exception);
                 }
 
                 if (splitPath.length == 2) {
@@ -91,98 +72,59 @@ public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
                         resultOfOperation = taskManager.addEpic(taskFromJson);
                         textForGson.setDone("add");
                     } else {
-                        textForGson.setDetail("Updating the epic is prohibited");
-                        sendBadRequest(httpExchange, gson.toJson(textForGson));
-                        return;
+                        throw new BadRequestException("Updating the epic is prohibited");
                     }
 
                     textForGson.setTaskIdNumber(taskFromJson.getIdNumber());
 
                     if (resultOfOperation == ResultOfOperation.SUCCESS) {
+                        textForGson.setRequest(null);
                         sendCreated(httpExchange, gson.toJson(textForGson));
                     } else {
                         textForGson.setDone(null);
-                        textForGson.setRequest(requestMethod + " " + httpExchange.getRequestURI());
                         textForGson.setDetail(resultOfOperation.name());
                         sendBadRequest(httpExchange, gson.toJson(textForGson));
                     }
                 } else {
-                    textForGson.setRequest(requestMethod + " " + httpExchange.getRequestURI());
-                    textForGson.setDetail("For POST path must be '/epics'");
-                    sendBadRequest(httpExchange, gson.toJson(textForGson));
+                    throw new BadRequestException("For POST path must be '/epics'");
                 }
                 return;
             }
 
             if (requestMethod.equals("GET")) {
                 if (splitPath.length == 2) {
-                    Optional<ArrayList<Epic>> allEpics = taskManager.getAllEpics();
-                    if (allEpics.isEmpty()) {
-                        textForGson.setDetail("List is empty");
-                        sendNotFound(httpExchange, gson.toJson(textForGson));
-                    } else {
-                        sendText(httpExchange, gson.toJson(allEpics.get()));
-                    }
+                    sendText(httpExchange, gson.toJson(taskManager.getAllEpics()));
                 } else if (splitPath.length == 3) {
+                    int id;
                     try {
-                        int id = Integer.valueOf(splitPath[2]);
-                        if (id > 0) {
-                            Optional<Epic> epic = taskManager.getEpicByIdNumber(id);
-                            if (epic.isEmpty()) {
-                                textForGson.setTaskType("epic");
-                                textForGson.setTaskIdNumber(id);
-                                textForGson.setDetail("Object not found");
-                                sendNotFound(httpExchange, gson.toJson(textForGson));
-                            } else {
-                                sendText(httpExchange, gson.toJson(epic.get()));
-                            }
-                        } else {
-                            textForGson.setRequest(requestMethod + " " + httpExchange.getRequestURI());
-                            textForGson.setDetail("Error: incorrect ID number");
-                            sendBadRequest(httpExchange, gson.toJson(textForGson));
-                        }
-                    } catch (NumberFormatException exception) {
-                        textForGson.setRequest(requestMethod + " " + httpExchange.getRequestURI());
-                        textForGson.setDetail("Invalid ID number format");
-                        sendBadRequest(httpExchange, gson.toJson(textForGson));
+                        id = Integer.valueOf(splitPath[2]);
+                    } catch (NumberFormatException numberFormatException) {
+                        throw new BadRequestException("The ID number format is incorrect: it must be a positive number.");
                     }
+                    sendText(httpExchange, gson.toJson(taskManager.getEpicByIdNumber(id)));
                 } else if (splitPath.length == 4 && splitPath[3].equals("subtasks")) {
+                    int id;
                     try {
-                        int id = Integer.valueOf(splitPath[2]);
-                        if (id > 0) {
-                            Optional<ArrayList<Subtask>> subtasksFromEpic = taskManager.getAllSubtasksFromEpic(id);
-                            if (subtasksFromEpic.isEmpty()) {
-                                textForGson.setDetail("List is empty");
-                                sendNotFound(httpExchange, gson.toJson(textForGson));
-                            } else {
-                                sendText(httpExchange, gson.toJson(subtasksFromEpic.get()));
-                            }
-                        } else {
-                            textForGson.setRequest(requestMethod + " " + httpExchange.getRequestURI());
-                            textForGson.setDetail("Error: incorrect ID number");
-                            sendBadRequest(httpExchange, gson.toJson(textForGson));
-                        }
-                    } catch (NumberFormatException exception) {
-                        textForGson.setRequest(requestMethod + " " + httpExchange.getRequestURI());
-                        textForGson.setDetail("Invalid ID number format");
-                        sendBadRequest(httpExchange, gson.toJson(textForGson));
+                        id = Integer.valueOf(splitPath[2]);
+                    } catch (NumberFormatException numberFormatException) {
+                        throw new BadRequestException("The ID number format is incorrect: it must be a positive number.");
                     }
+                    sendText(httpExchange, gson.toJson(taskManager.getAllSubtasksFromEpic(id)));
                 } else {
-                    textForGson.setRequest(requestMethod + " " + httpExchange.getRequestURI());
-                    textForGson.setDetail("For GET path must be '/epics' or '/epics/{id}' or '/epics/{id}/subtasks'");
-                    sendBadRequest(httpExchange, gson.toJson(textForGson));
+                    throw new BadRequestException("For GET path must be '/epics' or '/epics/{id}' or '/epics/{id}/subtasks'");
                 }
                 return;
             }
-        } catch (ManagerSaveException exception) {
-            textForGson.setRequest(requestMethod + " " + httpExchange.getRequestURI());
-            textForGson.setDetail(exception.getMessage());
+            throw new BadRequestException("Check request and try again. Note: only GET/POST/DELETE are supported");
+        } catch (NotFoundException notFoundException) {
+            textForGson.setDetail(notFoundException.getMessage());
+            sendNotFound(httpExchange, gson.toJson(textForGson));
+        } catch (BadRequestException badRequestException) {
+            textForGson.setDetail(badRequestException.getMessage());
+            sendBadRequest(httpExchange, gson.toJson(textForGson));
+        } catch (ManagerSaveException managerSaveException) {
+            textForGson.setDetail(managerSaveException.getMessage());
             sendError(httpExchange, gson.toJson(textForGson));
-            return;
         }
-
-        textForGson.setRequest(requestMethod + " " + httpExchange.getRequestURI());
-        textForGson.setDetail("Check request and try again. Note: only GET/POST/DELETE are supported");
-        sendBadRequest(httpExchange, gson.toJson(textForGson));
     }
 }

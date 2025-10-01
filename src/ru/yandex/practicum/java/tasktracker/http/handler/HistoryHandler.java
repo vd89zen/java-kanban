@@ -2,11 +2,9 @@ package ru.yandex.practicum.java.tasktracker.http.handler;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
-import ru.yandex.practicum.java.tasktracker.utils.AbstractTask;
 import ru.yandex.practicum.java.tasktracker.utils.TextForGson;
-import ru.yandex.practicum.java.tasktracker.utils.interfaces.TaskManager;
+import ru.yandex.practicum.java.tasktracker.service.interfaces.TaskManager;
 import java.io.IOException;
-import java.util.ArrayList;
 
 public class HistoryHandler extends BaseHttpHandler implements HttpHandler {
 
@@ -22,17 +20,16 @@ public class HistoryHandler extends BaseHttpHandler implements HttpHandler {
 
         if (requestMethod.equals("GET")) {
             if (splitPath.length == 2) {
-                ArrayList<AbstractTask> history = taskManager.getHistory();
-                sendText(httpExchange, gson.toJson(history));
+                sendText(httpExchange, gson.toJson(taskManager.getHistory()));
+                return;
             } else {
-                textForGson.setRequest(requestMethod + " " + httpExchange.getRequestURI());
                 textForGson.setDetail("Path must be '/history'");
-                sendBadRequest(httpExchange, gson.toJson(textForGson));
             }
         } else {
-            textForGson.setRequest(requestMethod + " " + httpExchange.getRequestURI());
             textForGson.setDetail("Method must be GET");
-            sendBadRequest(httpExchange, gson.toJson(textForGson));
         }
+
+        textForGson.setRequest(requestMethod + " " + httpExchange.getRequestURI());
+        sendBadRequest(httpExchange, gson.toJson(textForGson));
     }
 }

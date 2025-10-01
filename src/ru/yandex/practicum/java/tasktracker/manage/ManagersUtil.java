@@ -3,8 +3,8 @@ package ru.yandex.practicum.java.tasktracker.manage;
 import ru.yandex.practicum.java.tasktracker.service.FileBackedTaskManager;
 import ru.yandex.practicum.java.tasktracker.service.InMemoryHistoryManager;
 import ru.yandex.practicum.java.tasktracker.service.InMemoryTaskManager;
-import ru.yandex.practicum.java.tasktracker.utils.interfaces.HistoryManager;
-import ru.yandex.practicum.java.tasktracker.utils.interfaces.TaskManager;
+import ru.yandex.practicum.java.tasktracker.service.interfaces.HistoryManager;
+import ru.yandex.practicum.java.tasktracker.service.interfaces.TaskManager;
 
 import java.io.File;
 

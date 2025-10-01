@@ -1,27 +1,22 @@
 package ru.yandex.practicum.java.tasktracker.manage;
 
+import ru.yandex.practicum.java.tasktracker.exceptions.NotFoundException;
 import ru.yandex.practicum.java.tasktracker.task.*;
 import ru.yandex.practicum.java.tasktracker.utils.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Optional;
 import org.junit.jupiter.api.*;
 import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
 import ru.yandex.practicum.java.tasktracker.utils.enums.StatusProgress;
-import ru.yandex.practicum.java.tasktracker.utils.interfaces.TaskManager;
-
+import ru.yandex.practicum.java.tasktracker.service.interfaces.TaskManager;
 import static org.junit.jupiter.api.Assertions.*;
 
 abstract class TaskManagerTest<T extends TaskManager> {
     protected TaskManager taskManager;
     protected ResultOfOperation actualResult;
     protected ResultOfOperation expectedResult;
-    protected Optional expectedResponse;
-    protected Optional actualResponse;
     protected Task actualTask;
     protected Task expectedTask;
-    protected Epic actualEpic;
-    protected Epic expectedEpic;
     protected Subtask actualSubtask;
     protected Subtask expectedSubtask;
     protected final String DESCRIPTION = "description";
@@ -156,21 +151,18 @@ abstract class TaskManagerTest<T extends TaskManager> {
             //Given
             expectedTask = baseTask1;
             //When
-            actualTask = taskManager.getTaskByIdNumber(BASE_TASK_1_ID).orElse(new Task());
+            actualTask = taskManager.getTaskByIdNumber(BASE_TASK_1_ID);
             //Then
             assertEquals(expectedTask, actualTask);
         }
 
         @Test
-        @DisplayName("Проверяем получение Optional.empty если Task ID не найден в базе Менеджера")
+        @DisplayName("Проверяем выброс исключения если Task ID не найден в базе Менеджера")
         void getTaskForIdNumber_NotExists_Test() {
             //Given
-            expectedResponse = Optional.empty();
             Integer notExistsIdNumber = 666;
-            //When
-            actualResponse = taskManager.getTaskByIdNumber(notExistsIdNumber);
-            //Then
-            assertEquals(expectedResponse, actualResponse);
+            //When, Then
+            assertThrows(RuntimeException.class, () -> taskManager.getTaskByIdNumber(notExistsIdNumber));
         }
 
         @Test
@@ -183,11 +175,11 @@ abstract class TaskManagerTest<T extends TaskManager> {
             taskManager.addTask(testTaskUPD);
             System.out.println("\nTasks BEFORE test 'Проверяем обновление Task':");
             System.out.println(taskManager.getAllTasks());
-            testTaskUPD = taskManager.getTaskByIdNumber(testTaskUPD.getIdNumber()).get();
+            testTaskUPD = taskManager.getTaskByIdNumber(testTaskUPD.getIdNumber());
             //When
             testTaskUPD.setName(expectedName);
             taskManager.updateTask(testTaskUPD);
-            String actualName = taskManager.getTaskByIdNumber(testTaskUPD.getIdNumber()).get().getName().get();
+            String actualName = taskManager.getTaskByIdNumber(testTaskUPD.getIdNumber()).getName().get();
             System.out.println("\nTasks AFTER test 'Проверяем обновление Task':");
             System.out.println(taskManager.getAllTasks());
             //Then
@@ -198,16 +190,14 @@ abstract class TaskManagerTest<T extends TaskManager> {
         @DisplayName("Проверяем удаление существующей Task по ID")
         void removeTaskForIdNumber_Test() {
             //Given
-            expectedResponse = Optional.empty();
             System.out.println("\nTasks BEFORE test 'Проверяем удаление существующей Task по ID':");
             System.out.println(taskManager.getAllTasks());
             //When
             taskManager.removeTaskByIdNumber(BASE_TASK_1_ID);
-            actualResponse = taskManager.getTaskByIdNumber(BASE_TASK_1_ID);
+            //Then
             System.out.println("\nTasks AFTER test 'Проверяем удаление существующей Task по ID':");
             System.out.println(taskManager.getAllTasks());
-            //Then
-            assertEquals(expectedResponse, actualResponse);
+            assertThrows(RuntimeException.class, () -> taskManager.getTaskByIdNumber(BASE_TASK_1_ID));
         }
 
         @Test
@@ -217,7 +207,7 @@ abstract class TaskManagerTest<T extends TaskManager> {
             expectedListOfTasks.add(baseTask1);
             expectedListOfTasks.add(baseTask2);
             //When
-            ArrayList<Task> actualListOfTasks = taskManager.getAllTasks().get();
+            ArrayList<Task> actualListOfTasks = taskManager.getAllTasks();
             //Then
             assertEquals(expectedListOfTasks, actualListOfTasks);
         }
@@ -226,16 +216,18 @@ abstract class TaskManagerTest<T extends TaskManager> {
         @DisplayName("Проверяем удаление всех Task")
         void removeAllTasks_Test() {
             //Given
-            expectedResponse = Optional.empty();
             System.out.println("\nTasks BEFORE test 'Проверяем удаление всех Task':");
             System.out.println(taskManager.getAllTasks());
             //When
             taskManager.removeAllTasks();
-            actualResponse = taskManager.getAllTasks();
-            System.out.println("\nTasks AFTER test 'Проверяем удаление всех Task':");
-            System.out.println(taskManager.getAllTasks());
             //Then
-            assertEquals(expectedResponse, actualResponse);
+            System.out.println("\nTasks AFTER test 'Проверяем удаление всех Task':");
+            try {
+                taskManager.getAllTasks();
+            } catch (NotFoundException e) {
+                System.out.println(e.getMessage());
+            }
+            assertThrows(RuntimeException.class, () -> taskManager.getAllTasks());
         }
 
         @Test
@@ -250,7 +242,7 @@ abstract class TaskManagerTest<T extends TaskManager> {
             System.out.println(taskManager.getAllTasks());
             //When
             testTaskImmutability.setName(newName);
-            String actualName = taskManager.getTaskByIdNumber(testTaskImmutability.getIdNumber()).get().getName().get();
+            String actualName = taskManager.getTaskByIdNumber(testTaskImmutability.getIdNumber()).getName().get();
             System.out.println("\nTasks AFTER test 'Проверяем, что Task не меняется в Менеджере без вызова метода 'updateTask'':");
             System.out.println(taskManager.getAllTasks());
             //Then
@@ -283,7 +275,7 @@ abstract class TaskManagerTest<T extends TaskManager> {
             //Given
             int expectedEpicID = BASE_EPIC_1_ID;
             //When
-            int actualEpicID = taskManager.getEpicByIdNumber(BASE_EPIC_1_ID).get().getIdNumber();
+            int actualEpicID = taskManager.getEpicByIdNumber(BASE_EPIC_1_ID).getIdNumber();
             //Then
             assertEquals(expectedEpicID, actualEpicID);
         }
@@ -295,8 +287,7 @@ abstract class TaskManagerTest<T extends TaskManager> {
             ArrayList<Subtask> expectedListOfSubtasks = new ArrayList<>();
             expectedListOfSubtasks.add(baseSubtask1);
             //When
-            ArrayList<Subtask> actualListOfSubtasks = taskManager.getAllSubtasksFromEpic(BASE_EPIC_1_ID)
-                    .orElse(new ArrayList<>());
+            ArrayList<Subtask> actualListOfSubtasks = taskManager.getAllSubtasksFromEpic(BASE_EPIC_1_ID);
             //Then
             assertEquals(expectedListOfSubtasks, actualListOfSubtasks);
         }
@@ -308,12 +299,12 @@ abstract class TaskManagerTest<T extends TaskManager> {
             StatusProgress expectedStatusProgress = StatusProgress.DONE;
             String messageIfFail = "Если подазадчи DONE, эпик должен быть DONE";
             System.out.println("\nEpic/Subtasks BEFORE test 'Проверяем изменение статуса Epic после обновления Subtask с измененным статусом':");
-            System.out.println(taskManager.getAllEpics().get());
-            System.out.println(taskManager.getAllSubtasks().get());
+            System.out.println(taskManager.getAllEpics());
+            System.out.println(taskManager.getAllSubtasks());
             //When
             baseSubtask1.setStatusProgress(StatusProgress.DONE);
             taskManager.updateSubtask(baseSubtask1);
-            StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_1_ID).get().getStatusProgress();
+            StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_1_ID).getStatusProgress();
             System.out.println("\nEpic/Subtasks AFTER test 'Проверяем изменение статуса Epic после обновления Subtask с измененным статусом':");
             System.out.println(taskManager.getAllEpics());
             System.out.println(taskManager.getAllSubtasks());
@@ -328,9 +319,9 @@ abstract class TaskManagerTest<T extends TaskManager> {
             StatusProgress expectedStatusProgress = StatusProgress.NEW;
             System.out.println("\nПроверяем что статус Epic NEW, когда статус всех Subtasks NEW");
             //When
-            System.out.println(taskManager.getAllEpics().get());
-            System.out.println(taskManager.getAllSubtasks().get());
-            StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_2_ID).get().getStatusProgress();
+            System.out.println(taskManager.getAllEpics());
+            System.out.println(taskManager.getAllSubtasks());
+            StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_2_ID).getStatusProgress();
             //Then
             assertEquals(expectedStatusProgress, actualStatusProgress);
         }
@@ -346,9 +337,9 @@ abstract class TaskManagerTest<T extends TaskManager> {
             taskManager.updateSubtask(baseSubtask2);
             taskManager.updateSubtask(baseSubtask3);
             //When
-            System.out.println(taskManager.getAllEpics().get());
-            System.out.println(taskManager.getAllSubtasks().get());
-            StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_2_ID).get().getStatusProgress();
+            System.out.println(taskManager.getAllEpics());
+            System.out.println(taskManager.getAllSubtasks());
+            StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_2_ID).getStatusProgress();
             //Then
             assertEquals(expectedStatusProgress, actualStatusProgress);
         }
@@ -364,9 +355,9 @@ abstract class TaskManagerTest<T extends TaskManager> {
             taskManager.updateSubtask(baseSubtask2);
             taskManager.updateSubtask(baseSubtask3);
             //When
-            System.out.println(taskManager.getAllEpics().get());
-            System.out.println(taskManager.getAllSubtasks().get());
-            StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_2_ID).get().getStatusProgress();
+            System.out.println(taskManager.getAllEpics());
+            System.out.println(taskManager.getAllSubtasks());
+            StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_2_ID).getStatusProgress();
             //Then
             assertEquals(expectedStatusProgress, actualStatusProgress);
         }
@@ -380,9 +371,9 @@ abstract class TaskManagerTest<T extends TaskManager> {
             baseSubtask3.setStatusProgress(StatusProgress.DONE);
             taskManager.updateSubtask(baseSubtask3);
             //When
-            System.out.println(taskManager.getAllEpics().get());
-            System.out.println(taskManager.getAllSubtasks().get());
-            StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_2_ID).get().getStatusProgress();
+            System.out.println(taskManager.getAllEpics());
+            System.out.println(taskManager.getAllSubtasks());
+            StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_2_ID).getStatusProgress();
             //Then
             assertEquals(expectedStatusProgress, actualStatusProgress);
         }
@@ -400,9 +391,9 @@ abstract class TaskManagerTest<T extends TaskManager> {
             Subtask testSubtaskEpic2 = new Subtask("subtaskEpic2", DESCRIPTION, StatusProgress.NEW, BASE_EPIC_2_ID);
             taskManager.addSubtask(testSubtaskEpic2);
             //When
-            System.out.println(taskManager.getAllEpics().get());
-            System.out.println(taskManager.getAllSubtasks().get());
-            StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_2_ID).get().getStatusProgress();
+            System.out.println(taskManager.getAllEpics());
+            System.out.println(taskManager.getAllSubtasks());
+            StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_2_ID).getStatusProgress();
             //Then
             assertEquals(expectedStatusProgress, actualStatusProgress);
         }
@@ -418,9 +409,9 @@ abstract class TaskManagerTest<T extends TaskManager> {
             taskManager.updateSubtask(baseSubtask2);
             taskManager.updateSubtask(baseSubtask3);
             //When
-            System.out.println(taskManager.getAllEpics().get());
-            System.out.println(taskManager.getAllSubtasks().get());
-            StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_2_ID).get().getStatusProgress();
+            System.out.println(taskManager.getAllEpics());
+            System.out.println(taskManager.getAllSubtasks());
+            StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_2_ID).getStatusProgress();
             //Then
             assertEquals(expectedStatusProgress, actualStatusProgress);
         }
@@ -429,29 +420,27 @@ abstract class TaskManagerTest<T extends TaskManager> {
         @DisplayName("Проверяем удаление существующего Epic по ID")
         void removeEpicForIdNumber_Test() {
             //Given
-            expectedResponse = Optional.empty();
             System.out.println("\nEpic/Subtasks BEFORE test 'Проверяем удаление существующего Epic по ID':");
             System.out.println(taskManager.getAllEpics());
             System.out.println(taskManager.getAllSubtasks());
             //When
             taskManager.removeEpicByIdNumber(BASE_EPIC_WITHOUT_SUBTASK_ID);
-            actualResponse = taskManager.getEpicByIdNumber(BASE_EPIC_WITHOUT_SUBTASK_ID);
+            //Then
             System.out.println("\nEpic/Subtasks AFTER test 'Проверяем удаление существующего Epic по ID':");
             System.out.println(taskManager.getAllEpics());
             System.out.println(taskManager.getAllSubtasks());
-            //Then
-            assertEquals(expectedResponse, actualResponse);
+            assertThrows(RuntimeException.class, () -> taskManager.getEpicByIdNumber(BASE_EPIC_WITHOUT_SUBTASK_ID));
         }
 
         @Test
         @DisplayName("Проверяем получение всех Epic")
         void getAllEpics_Test() {
             ArrayList<Epic> expectedListOfEpics = new ArrayList<>();
-            expectedListOfEpics.add(taskManager.getEpicByIdNumber(BASE_EPIC_1_ID).get());
-            expectedListOfEpics.add(taskManager.getEpicByIdNumber(BASE_EPIC_2_ID).get());
-            expectedListOfEpics.add(taskManager.getEpicByIdNumber(BASE_EPIC_WITHOUT_SUBTASK_ID).get());
+            expectedListOfEpics.add(taskManager.getEpicByIdNumber(BASE_EPIC_1_ID));
+            expectedListOfEpics.add(taskManager.getEpicByIdNumber(BASE_EPIC_2_ID));
+            expectedListOfEpics.add(taskManager.getEpicByIdNumber(BASE_EPIC_WITHOUT_SUBTASK_ID));
             //When
-            ArrayList<Epic> actualListOfEpics = taskManager.getAllEpics().orElse(new ArrayList<>());
+            ArrayList<Epic> actualListOfEpics = taskManager.getAllEpics();
             //Then
             assertEquals(expectedListOfEpics, actualListOfEpics);
         }
@@ -460,18 +449,19 @@ abstract class TaskManagerTest<T extends TaskManager> {
         @DisplayName("Проверяем удаление всех Epic (и как следствие Subtask)")
         void removeAllEpics_Test() {
             //Given
-            expectedResponse = Optional.empty();
             System.out.println("\nEpic/Subtasks BEFORE test 'Проверяем удаление всех Epic (и как следствие Subtask)':");
             System.out.println(taskManager.getAllEpics());
             System.out.println(taskManager.getAllSubtasks());
             //When
             taskManager.removeAllEpics();
-            actualResponse = taskManager.getAllEpics();
             System.out.println("\nEpic/Subtasks AFTER test 'Проверяем удаление всех Epic':");
-            System.out.println(taskManager.getAllEpics());
-            System.out.println(taskManager.getAllSubtasks());
+            try {
+                taskManager.getAllEpics();
+            } catch (NotFoundException e) {
+                System.out.println(e.getMessage());
+            }
             //Then
-            assertEquals(expectedResponse, actualResponse);
+            assertThrows(RuntimeException.class, () -> taskManager.getAllEpics());
         }
 
         @Test
@@ -486,7 +476,7 @@ abstract class TaskManagerTest<T extends TaskManager> {
             System.out.println(taskManager.getAllEpics());
             //When
             taskManager.updateEpicName(testEpic.getIdNumber(), expectedName);
-            String actualName = taskManager.getEpicByIdNumber(testEpic.getIdNumber()).get().getName().get();
+            String actualName = taskManager.getEpicByIdNumber(testEpic.getIdNumber()).getName().get();
             System.out.println("\nEpic AFTER test 'Проверяем обновление Epic Name в Менеджере':");
             System.out.println(taskManager.getAllEpics());
             //Then
@@ -505,8 +495,7 @@ abstract class TaskManagerTest<T extends TaskManager> {
             System.out.println(taskManager.getAllEpics());
             //When
             taskManager.updateEpicDescription(testEpic.getIdNumber(), expectedDescription);
-            String actualDescription = taskManager.getEpicByIdNumber(testEpic.getIdNumber()).get()
-                    .getDescription().get();
+            String actualDescription = taskManager.getEpicByIdNumber(testEpic.getIdNumber()).getDescription().get();
             System.out.println("\nEpic AFTER test 'Проверяем обновление Epic Description в Менеджере':");
             System.out.println(taskManager.getAllEpics());
             //Then
@@ -526,7 +515,7 @@ abstract class TaskManagerTest<T extends TaskManager> {
             System.out.println(taskManager.getAllEpics());
             //When
             testEpicNameImmutability.setName(newName);
-            String actualName = taskManager.getEpicByIdNumber(testEpicNameImmutability.getIdNumber()).get().getName().get();
+            String actualName = taskManager.getEpicByIdNumber(testEpicNameImmutability.getIdNumber()).getName().get();
             System.out.println("\nEpic AFTER test 'Проверяем, что Epic Name не меняется в Менеджере без вызова метода" +
                     " 'updateEpicName'':");
             System.out.println(taskManager.getAllEpics());
@@ -547,7 +536,7 @@ abstract class TaskManagerTest<T extends TaskManager> {
             System.out.println(taskManager.getAllEpics());
             //When
             testEpicDescriptionImmutability.setDescription(newDescription);
-            String actualDescription = taskManager.getEpicByIdNumber(testEpicDescriptionImmutability.getIdNumber()).get()
+            String actualDescription = taskManager.getEpicByIdNumber(testEpicDescriptionImmutability.getIdNumber())
                     .getDescription().get();
             System.out.println("\nEpic AFTER test 'Проверяем, что Epic Description не меняется в Менеджере без вызова " +
                     "метода 'updateEpicDescription':");
@@ -603,7 +592,7 @@ abstract class TaskManagerTest<T extends TaskManager> {
             //Given
             expectedSubtask = baseSubtask1;
             //When
-            actualSubtask = taskManager.getSubtaskByIdNumber(BASE_SUBTASK_1_ID).orElse(new Subtask());
+            actualSubtask = taskManager.getSubtaskByIdNumber(BASE_SUBTASK_1_ID);
             //Then
             assertEquals(expectedSubtask, actualSubtask);
         }
@@ -611,25 +600,19 @@ abstract class TaskManagerTest<T extends TaskManager> {
         @Test
         @DisplayName("Проверяем удаление существующей Subtask по ID")
         void removeSubtaskForIdNumber_Test() {
-            //Given
-            expectedResponse = Optional.empty();
             //When
             taskManager.removeSubtaskByIdNumber(BASE_SUBTASK_1_ID);
-            actualResponse = taskManager.getSubtaskByIdNumber(BASE_SUBTASK_1_ID);
             //Then
-            assertEquals(expectedResponse, actualResponse);
+            assertThrows(RuntimeException.class, () -> taskManager.getSubtaskByIdNumber(BASE_SUBTASK_1_ID));
         }
 
         @Test
-        @DisplayName("Проверяем получение Optional.empty если Subtask ID не найден в базе Менеджера")
+        @DisplayName("Проверяем выброс исключения если Subtask ID не найден в базе Менеджера")
         void getSubtaskForIdNumber_Not_Exists_Test() {
             //Given
             Integer notExistsIdNumber = 666;
-            expectedResponse = Optional.empty();
-            //When
-            actualResponse = taskManager.getSubtaskByIdNumber(notExistsIdNumber);
-            //Then
-            assertEquals(expectedResponse, actualResponse);
+            //When, Then
+            assertThrows(RuntimeException.class, () -> taskManager.getSubtaskByIdNumber(notExistsIdNumber));
         }
 
         @Test
@@ -640,8 +623,7 @@ abstract class TaskManagerTest<T extends TaskManager> {
             baseSubtask2.setStatusProgress(StatusProgress.DONE);
             //When
             taskManager.updateSubtask(baseSubtask2);
-            StatusProgress actualStatusProgress = taskManager.getSubtaskByIdNumber(BASE_SUBTASK_2_ID).get()
-                    .getStatusProgress();
+            StatusProgress actualStatusProgress = taskManager.getSubtaskByIdNumber(BASE_SUBTASK_2_ID).getStatusProgress();
             //Then
             assertEquals(expectedStatusProgress, actualStatusProgress);
         }
@@ -654,7 +636,7 @@ abstract class TaskManagerTest<T extends TaskManager> {
             expectedListOfSubtasks.add(baseSubtask2);
             expectedListOfSubtasks.add(baseSubtask3);
             //When
-            ArrayList<Subtask> actualListOfSubtasks = taskManager.getAllSubtasks().orElse(new ArrayList<>());
+            ArrayList<Subtask> actualListOfSubtasks = taskManager.getAllSubtasks();
             //Then
             assertEquals(expectedListOfSubtasks, actualListOfSubtasks);
         }
@@ -662,13 +644,10 @@ abstract class TaskManagerTest<T extends TaskManager> {
         @Test
         @DisplayName("Проверяем удаление всех Subtask")
         void removeAllSubtasks_Test() {
-            //Given
-            expectedResponse = Optional.empty();
             //When
             taskManager.removeAllSubtasks();
-            actualResponse = taskManager.getAllSubtasks();
             //Then
-            assertEquals(expectedResponse, actualResponse);
+            assertThrows(RuntimeException.class, () -> taskManager.getAllSubtasks());
         }
 
         @Test
@@ -684,7 +663,7 @@ abstract class TaskManagerTest<T extends TaskManager> {
             System.out.println(taskManager.getAllSubtasks());
             //When
             testSubtaskImmutability.setName(newName);
-            String actualName = taskManager.getSubtaskByIdNumber(testSubtaskImmutability.getIdNumber()).get().getName().get();
+            String actualName = taskManager.getSubtaskByIdNumber(testSubtaskImmutability.getIdNumber()).getName().get();
             System.out.println("\nSubtasks AFTER test 'Проверяем, что Subtask не меняется в Менеджере без вызова метода " +
                     "'updateSubtask'':");
             System.out.println(taskManager.getAllSubtasks());
@@ -709,9 +688,9 @@ abstract class TaskManagerTest<T extends TaskManager> {
     void getHistory_Test() {
         //Given
         ArrayList<AbstractTask> expectedHistory = new ArrayList<>();
-        expectedHistory.add(taskManager.getTaskByIdNumber(BASE_TASK_2_ID).get());
-        expectedHistory.add(taskManager.getEpicByIdNumber(BASE_EPIC_2_ID).get());
-        expectedHistory.add(taskManager.getSubtaskByIdNumber(BASE_SUBTASK_2_ID).get());
+        expectedHistory.add(taskManager.getTaskByIdNumber(BASE_TASK_2_ID));
+        expectedHistory.add(taskManager.getEpicByIdNumber(BASE_EPIC_2_ID));
+        expectedHistory.add(taskManager.getSubtaskByIdNumber(BASE_SUBTASK_2_ID));
         //When
          ArrayList<AbstractTask> actualHistory = taskManager.getHistory();
         //Then
@@ -790,7 +769,7 @@ abstract class TaskManagerTest<T extends TaskManager> {
         //When
         baseTask2.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(2).plusMinutes(5));
         System.out.println("taskManager.updateTask(baseTask2):" + taskManager.updateTask(baseTask2));
-        Task newBaseTask2 = taskManager.getTaskByIdNumber(BASE_TASK_2_ID).get();
+        Task newBaseTask2 = taskManager.getTaskByIdNumber(BASE_TASK_2_ID);
         System.out.println("after" + taskManager.getPrioritizedTasks());
         //Then
         assertTrue(taskManager.getPrioritizedTasks().contains(newBaseTask2));

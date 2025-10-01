@@ -8,7 +8,7 @@ import ru.yandex.practicum.java.tasktracker.utils.enums.HttpResponseCode;
 import ru.yandex.practicum.java.tasktracker.utils.gson.AbstractTaskDeserializer;
 import ru.yandex.practicum.java.tasktracker.utils.gson.DurationTypeAdapter;
 import ru.yandex.practicum.java.tasktracker.utils.gson.LocalDateTimeTypeAdapter;
-import ru.yandex.practicum.java.tasktracker.utils.interfaces.TaskManager;
+import ru.yandex.practicum.java.tasktracker.service.interfaces.TaskManager;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.Charset;

@@ -1,4 +1,4 @@
-package ru.yandex.practicum.java.tasktracker.utils.interfaces;
+package ru.yandex.practicum.java.tasktracker.service.interfaces;
 
 import ru.yandex.practicum.java.tasktracker.utils.AbstractTask;
 import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;

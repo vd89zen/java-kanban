@@ -6,7 +6,7 @@ import java.util.Objects;
 import com.sun.net.httpserver.HttpServer;
 import ru.yandex.practicum.java.tasktracker.http.handler.*;
 import ru.yandex.practicum.java.tasktracker.manage.ManagersUtil;
-import ru.yandex.practicum.java.tasktracker.utils.interfaces.TaskManager;
+import ru.yandex.practicum.java.tasktracker.service.interfaces.TaskManager;
 
 public class HttpTaskServer {
     private static final int PORT = 8080;

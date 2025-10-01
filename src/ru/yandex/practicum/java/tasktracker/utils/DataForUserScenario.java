@@ -4,7 +4,7 @@ import ru.yandex.practicum.java.tasktracker.task.Epic;
 import ru.yandex.practicum.java.tasktracker.task.Subtask;
 import ru.yandex.practicum.java.tasktracker.task.Task;
 import ru.yandex.practicum.java.tasktracker.utils.enums.StatusProgress;
-import ru.yandex.practicum.java.tasktracker.utils.interfaces.TaskManager;
+import ru.yandex.practicum.java.tasktracker.service.interfaces.TaskManager;
 
 public class DataForUserScenario {
     private static final String DESCRIPTION = "description";

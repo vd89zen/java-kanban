@@ -5,7 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
 import ru.yandex.practicum.java.tasktracker.utils.enums.StatusProgress;
-import ru.yandex.practicum.java.tasktracker.utils.interfaces.HistoryManager;
+import ru.yandex.practicum.java.tasktracker.service.interfaces.HistoryManager;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -18,7 +18,6 @@ class InMemoryHistoryManagerTest extends TaskManagerTest {
         taskManager = ManagersUtil.getDefault();
         inMemoryHistoryManager = ManagersUtil.getDefaultHistory();
         fillData();
-
     }
 
     @Test
