@@ -1,9 +1,9 @@
 package ru.yandex.practicum.java.tasktracker.task;
 
 import ru.yandex.practicum.java.tasktracker.utils.AbstractTask;
-import ru.yandex.practicum.java.tasktracker.utils.ResultOfOperation;
-import ru.yandex.practicum.java.tasktracker.utils.StatusProgress;
-import ru.yandex.practicum.java.tasktracker.utils.TypesTasks;
+import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
+import ru.yandex.practicum.java.tasktracker.utils.enums.StatusProgress;
+import ru.yandex.practicum.java.tasktracker.utils.enums.TypesTasks;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.ArrayList;
@@ -95,7 +95,7 @@ public class Epic extends AbstractTask {
         } else if (subtask.getIdNumber() < 0 || idNumber < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
         } else if (subtasksFields.containsKey(subtask.getIdNumber()) == false) {
-            return ResultOfOperation.ERROR_SUBTASK_NOT_FOUND;
+            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
         }
 
         subtasksFields.get(subtask.getIdNumber()).updateFields(subtask);
@@ -107,7 +107,7 @@ public class Epic extends AbstractTask {
         if (idNumberSubtask < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
         } else if (subtasksFields.containsKey(idNumberSubtask) == false) {
-            return ResultOfOperation.ERROR_SUBTASK_NOT_FOUND;
+            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
         }
 
         subtasksFields.remove(idNumberSubtask);

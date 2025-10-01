@@ -1,4 +1,4 @@
-package ru.yandex.practicum.java.tasktracker.utils;
+package ru.yandex.practicum.java.tasktracker.utils.enums;
 
 public enum ResultOfOperation {
     SUCCESS,
@@ -8,7 +8,6 @@ public enum ResultOfOperation {
     ERROR_OBJECT_NOT_FOUND,
     ERROR_OBJECT_ALREADY_EXISTS,
     ERROR_OBJECT_ILLEGAL,
-    ERROR_SUBTASK_NOT_FOUND,
     ERROR_SUBTASKS_NOT_EMPTY,
     ERROR_MISMATCH_PARENT_ID,
     ERROR_NO_AVAILABLE_ID,

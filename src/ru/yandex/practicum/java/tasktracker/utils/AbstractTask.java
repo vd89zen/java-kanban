@@ -1,5 +1,9 @@
 package ru.yandex.practicum.java.tasktracker.utils;
 
+import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
+import ru.yandex.practicum.java.tasktracker.utils.enums.StatusProgress;
+import ru.yandex.practicum.java.tasktracker.utils.enums.TypesTasks;
+
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Objects;

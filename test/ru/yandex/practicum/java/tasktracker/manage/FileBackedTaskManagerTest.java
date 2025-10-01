@@ -5,9 +5,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import ru.yandex.practicum.java.tasktracker.exceptions.ManagerSaveException;
+import ru.yandex.practicum.java.tasktracker.exceptions.NotFoundException;
 import ru.yandex.practicum.java.tasktracker.service.FileBackedTaskManager;
 import ru.yandex.practicum.java.tasktracker.task.Task;
-import ru.yandex.practicum.java.tasktracker.utils.StatusProgress;
+import ru.yandex.practicum.java.tasktracker.utils.enums.StatusProgress;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -37,17 +38,21 @@ class FileBackedTaskManagerTest extends TaskManagerTest{
             System.out.println("Remove all epics: " + taskManager.removeAllEpics());
             System.out.println("BEFORE test 'Проверяем загрузку(добавление задач напрямую в коллекции) " +
                     "Менеджера из файла содержащего только строку заголовков'");
-            System.out.println(taskManager.getAllTasks());
-            System.out.println(taskManager.getAllEpics());
-            System.out.println(taskManager.getAllSubtasks());
+            try {
+                taskManager.getAllTasks();
+            } catch (NotFoundException e) {
+                System.out.println(e.getMessage());
+            }
             //When
             FileBackedTaskManager testTaskManager = FileBackedTaskManager.loadFromFileDirectlyToMap(baseTempFile);
             int actualNumberIdInWork = testTaskManager.getTotalOfIdInWork();
             System.out.println("\nAFTER test 'Проверяем загрузку(добавление задач напрямую в коллекции) " +
                     "Менеджера из файла содержащего только строку заголовков'");
-            System.out.println(testTaskManager.getAllTasks());
-            System.out.println(testTaskManager.getAllEpics());
-            System.out.println(testTaskManager.getAllSubtasks());
+            try {
+                testTaskManager.getAllTasks();
+            } catch (NotFoundException e) {
+                System.out.println(e.getMessage());
+            }
             //Then
             assertEquals(expectedNumberIdInWork, actualNumberIdInWork);
         }
@@ -62,17 +67,21 @@ class FileBackedTaskManagerTest extends TaskManagerTest{
             System.out.println("Remove all epics: " + taskManager.removeAllEpics());
             System.out.println("BEFORE test 'Проверяем загрузку(добавление задач через методы) " +
                     "Менеджера из файла содержащего только строку заголовков'");
-            System.out.println(taskManager.getAllTasks());
-            System.out.println(taskManager.getAllEpics());
-            System.out.println(taskManager.getAllSubtasks());
+            try {
+                taskManager.getAllTasks();
+            } catch (NotFoundException e) {
+                System.out.println(e.getMessage());
+            }
             //When
             FileBackedTaskManager testTaskManager = FileBackedTaskManager.loadFromFileUsingMethods(baseTempFile);
             int actualNumberIdInWork = testTaskManager.getTotalOfIdInWork();
             System.out.println("\nAFTER test 'Проверяем загрузку(добавление задач через методы) " +
                     "Менеджера из файла содержащего только строку заголовков'");
-            System.out.println(testTaskManager.getAllTasks());
-            System.out.println(testTaskManager.getAllEpics());
-            System.out.println(testTaskManager.getAllSubtasks());
+            try {
+                testTaskManager.getAllTasks();
+            } catch (NotFoundException e) {
+                System.out.println(e.getMessage());
+            }
             //Then
             assertEquals(expectedNumberIdInWork, actualNumberIdInWork);
         }

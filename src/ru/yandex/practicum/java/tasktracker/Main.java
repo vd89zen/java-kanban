@@ -1,35 +1,19 @@
 package ru.yandex.practicum.java.tasktracker;
 
-import ru.yandex.practicum.java.tasktracker.service.*;
-import ru.yandex.practicum.java.tasktracker.utils.*;
-import java.io.File;
+import ru.yandex.practicum.java.tasktracker.http.HttpTaskServer;
+import ru.yandex.practicum.java.tasktracker.manage.ManagersUtil;
+import ru.yandex.practicum.java.tasktracker.service.FileBackedTaskManager;
 import java.io.IOException;
 
 public class Main {
+
     public static void main(String[] args) throws IOException {
-        /*
-         *простое сравнение двух методов загрузки из файла
-         */
-        File tempFile = File.createTempFile("temptasks", ".csv");
+        FileBackedTaskManager fileBackedTaskManager = ManagersUtil.getFileBackedTaskManager();
+        HttpTaskServer httpTaskServer = new HttpTaskServer(fileBackedTaskManager);
+        httpTaskServer.start();
+        System.out.println("HTTP-сервер запущен на 8080 порту!");
 
-        FileBackedTaskManager fileBackedTaskManager = new FileBackedTaskManager(tempFile);
-        //1
-        DataForUserScenario.fillData(fileBackedTaskManager);
-        System.out.println("\nДанные из Менеджера созданного с нуля");
-        System.out.println(fileBackedTaskManager.getAllTasks());
-        System.out.println(fileBackedTaskManager.getAllEpics());
-        System.out.println(fileBackedTaskManager.getAllSubtasks());
-        //2
-        //Время загрузки FileBackedTaskManager.loadFromFileUsingMethods - 20376700 nanoseconds
-        //Время загрузки FileBackedTaskManager.loadFromFileDirectlyToMap - 5025100 nanoseconds
-
-        //FileBackedTaskManager fileBackedTaskManagerFromFile = FileBackedTaskManager.loadFromFileUsingMethods(tempFile);
-        FileBackedTaskManager fileBackedTaskManagerFromFile = FileBackedTaskManager.loadFromFileDirectlyToMap(tempFile);
-
-        //3
-        System.out.println("\nДанные из Менеджера созданного из файла");
-        System.out.println(fileBackedTaskManagerFromFile.getAllTasks());
-        System.out.println(fileBackedTaskManagerFromFile.getAllEpics());
-        System.out.println(fileBackedTaskManagerFromFile.getAllSubtasks());
+        //for test
+        //DataForUserScenario.fillData(fileBackedTaskManager);
     }
 }

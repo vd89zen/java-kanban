@@ -5,7 +5,7 @@ import ru.yandex.practicum.java.tasktracker.task.Epic;
 import ru.yandex.practicum.java.tasktracker.task.Subtask;
 import ru.yandex.practicum.java.tasktracker.task.Task;
 import ru.yandex.practicum.java.tasktracker.utils.CommaSeparatedValuesCreateProcess;
-import ru.yandex.practicum.java.tasktracker.utils.ResultOfOperation;
+import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
 import java.util.ArrayList;
 import java.util.List;
 import java.nio.file.Files;
@@ -23,7 +23,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
         final int HEADER_TYPE = 1;
         if (Files.exists(file.toPath())) {
             FileBackedTaskManager fileBackedTaskManager = new FileBackedTaskManager(file);
-            isLoadFromFile =true;
+            isLoadFromFile = true;
             try {
                 List<String> stringsFromFile = Files.readAllLines(file.toPath());
                 ArrayList<Subtask> subtasksList = new ArrayList<>();
@@ -191,8 +191,8 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
     }
 
     @Override
-    public ResultOfOperation removeTaskForIdNumber(int taskIdNumber) {
-        ResultOfOperation resultOfOperation = super.removeTaskForIdNumber(taskIdNumber);
+    public ResultOfOperation removeTaskByIdNumber(int taskIdNumber) {
+        ResultOfOperation resultOfOperation = super.removeTaskByIdNumber(taskIdNumber);
         if (resultOfOperation == ResultOfOperation.SUCCESS) {
             save();
         }
@@ -236,8 +236,8 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
     }
 
     @Override
-    public ResultOfOperation removeEpicForIdNumber(int epicIdNumber) {
-        ResultOfOperation resultOfOperation = super.removeEpicForIdNumber(epicIdNumber);
+    public ResultOfOperation removeEpicByIdNumber(int epicIdNumber) {
+        ResultOfOperation resultOfOperation = super.removeEpicByIdNumber(epicIdNumber);
         if (resultOfOperation == ResultOfOperation.SUCCESS) {
             save();
         }
@@ -263,8 +263,8 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
     }
 
     @Override
-    public ResultOfOperation removeSubtaskForIdNumber(int subtaskIdNumber) {
-        ResultOfOperation resultOfOperation = super.removeSubtaskForIdNumber(subtaskIdNumber);
+    public ResultOfOperation removeSubtaskByIdNumber(int subtaskIdNumber) {
+        ResultOfOperation resultOfOperation = super.removeSubtaskByIdNumber(subtaskIdNumber);
         if (resultOfOperation == ResultOfOperation.SUCCESS) {
             save();
         }

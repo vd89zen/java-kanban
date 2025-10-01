@@ -1,8 +1,13 @@
 package ru.yandex.practicum.java.tasktracker.service;
 
+import ru.yandex.practicum.java.tasktracker.exceptions.NotFoundException;
 import ru.yandex.practicum.java.tasktracker.manage.ManagersUtil;
 import ru.yandex.practicum.java.tasktracker.task.*;
 import ru.yandex.practicum.java.tasktracker.utils.*;
+import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
+import ru.yandex.practicum.java.tasktracker.service.interfaces.HistoryManager;
+import ru.yandex.practicum.java.tasktracker.service.interfaces.TaskManager;
+
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -106,8 +111,8 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     @Override
-    public TreeSet<AbstractTask> getPrioritizedTasks() {
-        return prioritizedTasks;
+    public ArrayList<AbstractTask> getPrioritizedTasks() {
+        return new ArrayList<>(prioritizedTasks);
     }
 
     @Override
@@ -155,16 +160,15 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     @Override
-    public Optional<ArrayList<Task>> getAllTasks() {
+    public ArrayList<Task> getAllTasks() throws NotFoundException {
         if (tasks.isEmpty()) {
-            return Optional.empty();
+            throw new NotFoundException("List is empty");
         }
 
-        return Optional.of(
-                tasks.values().stream()
-                        .map(Task::new)
-                        .collect(Collectors.toCollection(ArrayList::new))
-        );
+        return tasks.values().stream()
+                .map(Task::new)
+                .collect(Collectors.toCollection(ArrayList::new)
+                );
     }
 
     @Override
@@ -184,23 +188,23 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     @Override
-    public Optional<Task> getTaskForIdNumber(int taskIdNumber) {
-        if (taskIdNumber < 0 || tasks.isEmpty() || tasks.containsKey(taskIdNumber) == false) {
-            return Optional.empty();
+    public Task getTaskByIdNumber(int taskIdNumber) throws NotFoundException {
+        if (taskIdNumber <= 0 || tasks.isEmpty() || tasks.containsKey(taskIdNumber) == false) {
+            throw new NotFoundException(String.format("Task (id: %d) for 'get' not found", taskIdNumber));
         }
         historyManager.addRecord(tasks.get(taskIdNumber));
-        return Optional.of(new Task(tasks.get(taskIdNumber)));
+        return new Task(tasks.get(taskIdNumber));
     }
 
     @Override
-    public ResultOfOperation updateTask(Task task) {
+    public ResultOfOperation updateTask(Task task) throws NotFoundException {
         if (task == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
         } else if (task.getName().isEmpty() || task.getDescription().isEmpty()
                 || task.getStatusProgress() == null) {
             return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
-        } else if (tasks.isEmpty() || tasks.containsKey(task.getIdNumber()) == false) {
-            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
+        } else if (task.getIdNumber() <= 0 || tasks.isEmpty() || tasks.containsKey(task.getIdNumber()) == false) {
+            throw new NotFoundException(String.format("Task (id: %d) for 'update' not found", task.getIdNumber()));
         } else if (isTimeIntersectWithOthers(task)) {
             return ResultOfOperation.ERROR_INTERSECT_TIME;
         }
@@ -214,11 +218,9 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     @Override
-    public ResultOfOperation removeTaskForIdNumber(int taskIdNumber) {
-        if (taskIdNumber < 0) {
-            return ResultOfOperation.ERROR_ID_LESS_ZERO;
-        } else if (tasks.isEmpty() || tasks.containsKey(taskIdNumber) == false) {
-            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
+    public ResultOfOperation removeTaskByIdNumber(int taskIdNumber) throws NotFoundException {
+        if (taskIdNumber <= 0 || tasks.isEmpty() || tasks.containsKey(taskIdNumber) == false) {
+            throw new NotFoundException(String.format("Task (id: %d) for 'remove' not found", taskIdNumber));
         }
 
         prioritizedTasks.remove(tasks.get(taskIdNumber));
@@ -233,7 +235,7 @@ public class InMemoryTaskManager implements TaskManager {
     public ResultOfOperation addEpic(Epic epic) {
         if (epic == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
-        } else if (epic.getName() == null || epic.getDescription() == null
+        } else if (epic.getName().isEmpty() || epic.getDescription().isEmpty()
                 || epic.getStatusProgress() == null) {
             return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
         } else if (epic.getIdNumber() < 0) {
@@ -244,15 +246,20 @@ public class InMemoryTaskManager implements TaskManager {
             return ResultOfOperation.ERROR_SUBTASKS_NOT_EMPTY;
         }
 
-        epicForWork = new Epic(epic);
-
-        if (epicForWork.getIdNumber() == 0) {
+        if (epic.getIdNumber() == 0) {
+            if (epic.getDurationInMinutes() != 0 || epic.getStartDateTime().isPresent()
+                    || epic.getEndDateTime().isPresent()) {
+                return ResultOfOperation.ERROR_OBJECT_ILLEGAL;
+            }
+            epicForWork = new Epic(epic.getName().get(), epic.getDescription().get());
             if (generateIdNumber() == ResultOfOperation.SUCCESS) {
                 epicForWork.setIdNumber(counterForIdNumber);
                 epic.setIdNumber(counterForIdNumber);
             } else {
                 return ResultOfOperation.ERROR_NO_AVAILABLE_ID;
             }
+        } else {
+            epicForWork = new Epic(epic);
         }
 
         epics.put(epicForWork.getIdNumber(), epicForWork);
@@ -262,30 +269,31 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     @Override
-    public Optional<ArrayList<Epic>> getAllEpics() {
+    public ArrayList<Epic> getAllEpics() throws NotFoundException {
         if (epics.isEmpty()) {
-            return Optional.empty();
+            throw new NotFoundException("List is empty");
         }
 
-        return Optional.of(
-                epics.values().stream()
-                        .map(Epic::new)
-                        .collect(Collectors.toCollection(ArrayList::new))
-        );
+        return epics.values().stream()
+                .map(Epic::new)
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     @Override
-    public Optional<ArrayList<Subtask>> getAllSubtasksFromEpic(int epicIdNumber) {
-        if (epicIdNumber < 0 || epics.isEmpty() || subtasks.isEmpty()) {
-            return Optional.empty();
+    public ArrayList<Subtask> getAllSubtasksFromEpic(int epicIdNumber) throws NotFoundException {
+        if (epicIdNumber <= 0 || epics.isEmpty()) {
+            throw new NotFoundException(String.format("Epic (id: %d) for 'get subtasks' not found", epicIdNumber));
         }
 
-        return Optional.of(
-                subtasks.values().stream()
-                        .filter(subtask -> subtask.getParentEpicIdNumber() == epicIdNumber)
-                        .map(Subtask::new)
-                        .collect(Collectors.toCollection(ArrayList::new))
-        );
+        if (subtasks.isEmpty()) {
+            throw new NotFoundException("List is empty");
+        }
+
+        return subtasks.values().stream()
+                .filter(subtask -> subtask.getParentEpicIdNumber() == epicIdNumber)
+                .map(Subtask::new)
+                .collect(Collectors.toCollection(ArrayList::new)
+                );
     }
 
     /*
@@ -349,20 +357,18 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     @Override
-    public Optional<Epic> getEpicForIdNumber(int epicIdNumber) {
-        if (epicIdNumber < 0 || epics.isEmpty() || epics.containsKey(epicIdNumber) == false) {
-            return Optional.empty();
+    public Epic getEpicByIdNumber(int epicIdNumber) throws NotFoundException {
+        if (epicIdNumber <= 0 || epics.isEmpty() || epics.containsKey(epicIdNumber) == false) {
+            throw new NotFoundException(String.format("Epic (id: %d) for 'get' not found", epicIdNumber));
         }
         historyManager.addRecord(epics.get(epicIdNumber));
-        return Optional.of(new Epic(epics.get(epicIdNumber)));
+        return new Epic(epics.get(epicIdNumber));
     }
 
     @Override
-    public ResultOfOperation removeEpicForIdNumber(int epicIdNumber) {
-        if (epicIdNumber < 0) {
-            return ResultOfOperation.ERROR_ID_LESS_ZERO;
-        } else if (epics.isEmpty() || epics.containsKey(epicIdNumber) == false) {
-            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
+    public ResultOfOperation removeEpicByIdNumber(int epicIdNumber) {
+        if (epicIdNumber <= 0 || epics.isEmpty() || epics.containsKey(epicIdNumber) == false) {
+            throw new NotFoundException(String.format("Epic (id: %d) for 'remove' not found", epicIdNumber));
         }
 
         if (subtasks.isEmpty() == false) {
@@ -389,13 +395,11 @@ public class InMemoryTaskManager implements TaskManager {
         } else if (subtask.getName().isEmpty() || subtask.getDescription().isEmpty()
                 || subtask.getStatusProgress() == null) {
             return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
-        } else if (epics.isEmpty()) {
-            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
         } else if (subtask.getIdNumber() < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
         } else if (allIdInWork.contains(subtask.getIdNumber())) {
             return ResultOfOperation.ERROR_OBJECT_ALREADY_EXISTS;
-        } else if (epics.containsKey(subtask.getParentEpicIdNumber()) == false) {
+        } else if (epics.isEmpty() || epics.containsKey(subtask.getParentEpicIdNumber()) == false) {
             return ResultOfOperation.ERROR_MISMATCH_PARENT_ID;
         } else if (isTimeIntersectWithOthers(subtask)) {
             return ResultOfOperation.ERROR_INTERSECT_TIME;
@@ -427,16 +431,15 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     @Override
-    public Optional<ArrayList<Subtask>> getAllSubtasks() {
+    public ArrayList<Subtask> getAllSubtasks() throws NotFoundException {
         if (epics.isEmpty() || subtasks.isEmpty()) {
-            return Optional.empty();
+            throw new NotFoundException("List is empty");
         }
 
-        return Optional.of(
-                subtasks.values().stream()
-                        .map(Subtask::new)
-                        .collect(Collectors.toCollection(ArrayList::new))
-        );
+        return subtasks.values().stream()
+                .map(Subtask::new)
+                .collect(Collectors.toCollection(ArrayList::new)
+                );
     }
 
     @Override
@@ -456,22 +459,20 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     @Override
-    public Optional<Subtask> getSubtaskForIdNumber(int subtaskIdNumber) {
-        if (subtaskIdNumber < 0 || epics.isEmpty() || subtasks.isEmpty()
+    public Subtask getSubtaskByIdNumber(int subtaskIdNumber) throws NotFoundException {
+        if (subtaskIdNumber <= 0 || epics.isEmpty() || subtasks.isEmpty()
                 || subtasks.containsKey(subtaskIdNumber) == false) {
-            return Optional.empty();
+            throw new NotFoundException(String.format("Subtask (id: %d) for 'get' not found", subtaskIdNumber));
         }
 
         historyManager.addRecord(subtasks.get(subtaskIdNumber));
-        return Optional.of(new Subtask(subtasks.get(subtaskIdNumber)));
+        return new Subtask(subtasks.get(subtaskIdNumber));
     }
 
     @Override
-    public ResultOfOperation removeSubtaskForIdNumber(int subtaskIdNumber) {
-        if (subtaskIdNumber < 0) {
-            return ResultOfOperation.ERROR_ID_LESS_ZERO;
-        } else if (epics.isEmpty() || subtasks.isEmpty() || subtasks.containsKey(subtaskIdNumber) == false) {
-            return ResultOfOperation.ERROR_SUBTASK_NOT_FOUND;
+    public ResultOfOperation removeSubtaskByIdNumber(int subtaskIdNumber) throws NotFoundException {
+        if (subtaskIdNumber <= 0 || epics.isEmpty() || subtasks.isEmpty() || subtasks.containsKey(subtaskIdNumber) == false) {
+            throw new NotFoundException(String.format("Subtask (id: %d) for 'remove' not found", subtaskIdNumber));
         }
 
         int parentEpicIdNumber = subtasks.get(subtaskIdNumber).getParentEpicIdNumber();
@@ -482,15 +483,16 @@ public class InMemoryTaskManager implements TaskManager {
         if (epics.containsKey(parentEpicIdNumber)) {
             return epics.get(parentEpicIdNumber).removeSubtask(subtaskIdNumber);
         } else {
-            return ResultOfOperation.ERROR_MISMATCH_PARENT_ID;
+            throw new NotFoundException(String.format("Subtask (id: %d) for 'remove' not found: %s",
+                    subtaskIdNumber, ResultOfOperation.ERROR_MISMATCH_PARENT_ID.name()));
         }
     }
 
     @Override
-    public ResultOfOperation updateSubtask(Subtask subtask) {
+    public ResultOfOperation updateSubtask(Subtask subtask) throws NotFoundException {
         if (subtask == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
-        } else if (subtask.getName() == null || subtask.getDescription() == null
+        } else if (subtask.getName().isEmpty() || subtask.getDescription().isEmpty()
                 || subtask.getStatusProgress() == null) {
             return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
         }
@@ -499,10 +501,8 @@ public class InMemoryTaskManager implements TaskManager {
         int subtaskParentEpicIdNumber = subtask.getParentEpicIdNumber();
         subtaskForWork = new Subtask(subtask);
 
-        if (subtaskIdNumber < 0) {
-            return ResultOfOperation.ERROR_ID_LESS_ZERO;
-        } else if (epics.isEmpty() || subtasks.isEmpty() || subtasks.containsKey(subtaskIdNumber) == false) {
-            return ResultOfOperation.ERROR_SUBTASK_NOT_FOUND;
+        if (subtaskIdNumber <= 0 || epics.isEmpty() || subtasks.isEmpty() || subtasks.containsKey(subtaskIdNumber) == false) {
+            throw new NotFoundException(String.format("Subtask (id: %d) for 'update' not found", subtask.getIdNumber()));
         } else if (epics.containsKey(subtaskParentEpicIdNumber) == false
                 || subtasks.get(subtaskIdNumber).getParentEpicIdNumber() != subtaskParentEpicIdNumber) {
             return ResultOfOperation.ERROR_MISMATCH_PARENT_ID;

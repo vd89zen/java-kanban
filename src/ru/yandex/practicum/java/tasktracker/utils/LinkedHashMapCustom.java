@@ -1,6 +1,8 @@
 package ru.yandex.practicum.java.tasktracker.utils;
 
 import ru.yandex.practicum.java.tasktracker.task.*;
+import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Objects;
