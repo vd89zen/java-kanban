@@ -11,9 +11,5 @@ public class TaskTrackerApplication {
         FileBackedTaskManager fileBackedTaskManager = ManagersUtil.getFileBackedTaskManager();
         HttpTaskServer httpTaskServer = new HttpTaskServer(fileBackedTaskManager);
         httpTaskServer.start();
-        System.out.println("HTTP-сервер запущен на 8080 порту!");
-
-        //for test
-        //DataForUserScenario.fillData(fileBackedTaskManager);
     }
 }

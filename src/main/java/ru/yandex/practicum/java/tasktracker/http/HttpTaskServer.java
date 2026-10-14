@@ -7,8 +7,11 @@ import com.sun.net.httpserver.HttpServer;
 import ru.yandex.practicum.java.tasktracker.http.handler.*;
 import ru.yandex.practicum.java.tasktracker.manage.ManagersUtil;
 import ru.yandex.practicum.java.tasktracker.service.interfaces.TaskManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HttpTaskServer {
+    private static final Logger log = LoggerFactory.getLogger(HttpTaskServer.class);
     private static final int PORT = 8080;
     private static final int BACKLOG = 0;
     private final HttpServer httpServer;
@@ -28,10 +31,12 @@ public class HttpTaskServer {
 
     public void start() {
         httpServer.start();
+        log.info("HTTP server started on port {}", PORT);
     }
 
     public void stop() {
         httpServer.stop(1);
+        log.info("HTTP server stopped");
     }
 
     private void createContext() {
