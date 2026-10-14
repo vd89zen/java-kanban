@@ -1,5 +1,6 @@
 package ru.yandex.practicum.java.tasktracker.manage;
 
+import ru.yandex.practicum.java.tasktracker.config.AppConfig;
 import ru.yandex.practicum.java.tasktracker.service.FileBackedTaskManager;
 import ru.yandex.practicum.java.tasktracker.service.InMemoryHistoryManager;
 import ru.yandex.practicum.java.tasktracker.service.InMemoryTaskManager;
@@ -22,6 +23,11 @@ public final class ManagersUtil {
     }
 
     public static FileBackedTaskManager getFileBackedTaskManager() {
-        return FileBackedTaskManager.loadFromFileUsingMethods(new File("resources/tasks.csv"));
+        String dataFilePath = AppConfig.getDataFilePath();
+        return FileBackedTaskManager.loadFromFileUsingMethods(new File(dataFilePath));
+    }
+
+    public static FileBackedTaskManager getFileBackedTaskManager(File file) {
+        return FileBackedTaskManager.loadFromFileUsingMethods(file);
     }
 }
