@@ -68,7 +68,8 @@ public class SubtasksHandler extends BaseHttpHandler implements HttpHandler {
                 if (splitPath.length == 2) {
                     textForGson.setTaskType("subtask");
 
-                    if (taskFromJson.getIdNumber() == 0) {
+                    if (taskFromJson.getIdNumber() <= 0) {
+                        taskFromJson.setIdNumber(0);
                         resultOfOperation = taskManager.addSubtask(taskFromJson);
                         textForGson.setDone("add");
                     } else {

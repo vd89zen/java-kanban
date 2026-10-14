@@ -68,7 +68,8 @@ public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
                 if (splitPath.length == 2) {
                     textForGson.setTaskType("epic");
 
-                    if (taskFromJson.getIdNumber() == 0) {
+                    if (taskFromJson.getIdNumber() <= 0) {
+                        taskFromJson.setIdNumber(0);
                         resultOfOperation = taskManager.addEpic(taskFromJson);
                         textForGson.setDone("add");
                     } else {

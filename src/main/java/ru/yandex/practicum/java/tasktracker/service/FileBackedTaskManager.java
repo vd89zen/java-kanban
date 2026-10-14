@@ -6,6 +6,8 @@ import ru.yandex.practicum.java.tasktracker.task.Subtask;
 import ru.yandex.practicum.java.tasktracker.task.Task;
 import ru.yandex.practicum.java.tasktracker.utils.CommaSeparatedValuesCreateProcess;
 import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
+
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -135,38 +137,41 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
             return;
         }
 
-        try {
-            Files.createDirectories(file.toPath().getParent());
-
-            try (BufferedWriter bufferedWriter = Files.newBufferedWriter(file.toPath())) {
-                bufferedWriter.write(csvManager.getHeadersForCSV());
-                bufferedWriter.newLine();
-
-                List<Task> sortedTasks = new ArrayList<>(tasks.values());
-                sortedTasks.sort(Comparator.comparingInt(Task::getIdNumber));
-                for (Task task : sortedTasks) {
-                    bufferedWriter.write(csvManager.toString(task));
-                    bufferedWriter.newLine();
-                }
-
-                List<Epic> sortedEpics = new ArrayList<>(epics.values());
-                sortedEpics.sort(Comparator.comparingInt(Epic::getIdNumber));
-                for (Epic epic : sortedEpics) {
-                    bufferedWriter.write(csvManager.toString(epic));
-                    bufferedWriter.newLine();
-                }
-
-                List<Subtask> sortedSubtasks = new ArrayList<>(subtasks.values());
-                sortedSubtasks.sort(Comparator.comparingInt(Subtask::getIdNumber));
-                for (Subtask subtask : sortedSubtasks) {
-                    bufferedWriter.write(csvManager.toString(subtask));
-                    bufferedWriter.newLine();
-                }
+        Path parentPath = file.toPath().getParent();
+        if (parentPath != null) {
+            try {
+                Files.createDirectories(parentPath);
             } catch (IOException exception) {
-                throw new ManagerSaveException("Ошибка записи в файл: " + file.getName());
+                throw new ManagerSaveException("Ошибка создания директории: " + file.getPath());
+            }
+        }
+
+        try (BufferedWriter bufferedWriter = Files.newBufferedWriter(file.toPath())) {
+            bufferedWriter.write(csvManager.getHeadersForCSV());
+            bufferedWriter.newLine();
+
+            List<Task> sortedTasks = new ArrayList<>(tasks.values());
+            sortedTasks.sort(Comparator.comparingInt(Task::getIdNumber));
+            for (Task task : sortedTasks) {
+                bufferedWriter.write(csvManager.toString(task));
+                bufferedWriter.newLine();
+            }
+
+            List<Epic> sortedEpics = new ArrayList<>(epics.values());
+            sortedEpics.sort(Comparator.comparingInt(Epic::getIdNumber));
+            for (Epic epic : sortedEpics) {
+                bufferedWriter.write(csvManager.toString(epic));
+                bufferedWriter.newLine();
+            }
+
+            List<Subtask> sortedSubtasks = new ArrayList<>(subtasks.values());
+            sortedSubtasks.sort(Comparator.comparingInt(Subtask::getIdNumber));
+            for (Subtask subtask : sortedSubtasks) {
+                bufferedWriter.write(csvManager.toString(subtask));
+                bufferedWriter.newLine();
             }
         } catch (IOException exception) {
-            throw new ManagerSaveException("Ошибка создания директории: " + file.getParent());
+            throw new ManagerSaveException("Ошибка записи в файл: " + file.getName());
         }
     }
 

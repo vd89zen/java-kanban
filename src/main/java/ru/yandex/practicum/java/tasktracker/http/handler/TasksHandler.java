@@ -68,7 +68,8 @@ public class TasksHandler extends BaseHttpHandler implements HttpHandler {
                 if (splitPath.length == 2) {
                     textForGson.setTaskType("task");
 
-                    if (taskFromJson.getIdNumber() == 0) {
+                    if (taskFromJson.getIdNumber() <= 0) {
+                        taskFromJson.setIdNumber(0);
                         resultOfOperation = taskManager.addTask(taskFromJson);
                         textForGson.setDone("add");
                     } else {
