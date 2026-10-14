@@ -7,6 +7,7 @@ import ru.yandex.practicum.java.tasktracker.task.Task;
 import ru.yandex.practicum.java.tasktracker.utils.CommaSeparatedValuesCreateProcess;
 import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.nio.file.Files;
 import java.io.File;
@@ -141,17 +142,23 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                 bufferedWriter.write(csvManager.getHeadersForCSV());
                 bufferedWriter.newLine();
 
-                for (Task task : tasks.values()) {
+                List<Task> sortedTasks = new ArrayList<>(tasks.values());
+                sortedTasks.sort(Comparator.comparingInt(Task::getIdNumber));
+                for (Task task : sortedTasks) {
                     bufferedWriter.write(csvManager.toString(task));
                     bufferedWriter.newLine();
                 }
 
-                for (Epic epic : epics.values()) {
+                List<Epic> sortedEpics = new ArrayList<>(epics.values());
+                sortedEpics.sort(Comparator.comparingInt(Epic::getIdNumber));
+                for (Epic epic : sortedEpics) {
                     bufferedWriter.write(csvManager.toString(epic));
                     bufferedWriter.newLine();
                 }
 
-                for (Subtask subtask : subtasks.values()) {
+                List<Subtask> sortedSubtasks = new ArrayList<>(subtasks.values());
+                sortedSubtasks.sort(Comparator.comparingInt(Subtask::getIdNumber));
+                for (Subtask subtask : sortedSubtasks) {
                     bufferedWriter.write(csvManager.toString(subtask));
                     bufferedWriter.newLine();
                 }
