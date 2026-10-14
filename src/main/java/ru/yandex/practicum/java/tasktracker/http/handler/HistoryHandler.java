@@ -17,6 +17,7 @@ public class HistoryHandler extends BaseHttpHandler implements HttpHandler {
         TextForGson textForGson = new TextForGson();
         String requestMethod = httpExchange.getRequestMethod();
         String[] splitPath = httpExchange.getRequestURI().getPath().split("/");
+        textForGson.setRequest(requestMethod + " " + httpExchange.getRequestURI());
 
         if (requestMethod.equals("GET")) {
             if (splitPath.length == 2) {
@@ -24,12 +25,12 @@ public class HistoryHandler extends BaseHttpHandler implements HttpHandler {
                 return;
             } else {
                 textForGson.setDetail("Path must be '/history'");
+                sendBadRequest(httpExchange, gson.toJson(textForGson));
+                return;
             }
-        } else {
-            textForGson.setDetail("Method must be GET");
         }
 
-        textForGson.setRequest(requestMethod + " " + httpExchange.getRequestURI());
-        sendBadRequest(httpExchange, gson.toJson(textForGson));
+        textForGson.setDetail("Method '" + requestMethod + "' is not allowed. Allowed: GET");
+        sendMethodNotAllowed(httpExchange, gson.toJson(textForGson), "GET");
     }
 }

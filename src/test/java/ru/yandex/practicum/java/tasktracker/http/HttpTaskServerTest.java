@@ -57,7 +57,7 @@ class HttpTaskServerTest {
         @DisplayName("Проверяем эндпоинт 'DELETE /tasks{id}' - удаление Task.")
         void endpointTasks_Delete_Task_Test() throws IOException, InterruptedException {
             //Given
-            int expectedStatusCode = 200;
+            int expectedStatusCode = 204;
 
             Task task = new Task("task", "test task", StatusProgress.NEW, 10,
                     LocalDateTime.now().withNano(0));
@@ -72,7 +72,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
             assertThrows(RuntimeException.class, () -> taskManager.getTaskByIdNumber(task.getIdNumber()));
         }
@@ -113,7 +112,7 @@ class HttpTaskServerTest {
         @DisplayName("Проверяем эндпоинт 'POST /tasks' - обновление Task.")
         void endpointTasks_Update_Task_Test() throws IOException, InterruptedException {
             //Given
-            int expectedStatusCode = 201;
+            int expectedStatusCode = 200;
             StatusProgress expectedStatusProgress = StatusProgress.IN_PROGRESS;
 
             Task task = new Task("task", "test task", StatusProgress.NEW, 10,
@@ -228,22 +227,22 @@ class HttpTaskServerTest {
         @DisplayName("Проверяем ответ сервера (406) - эндпоинт 'POST /tasks' добавление Task пересекающейся по времени.")
         void endpointTasks_Add_Task_Has_Time_Intersect_Test() throws IOException, InterruptedException {
             //Given
-            int expectedStatusCode = 406;
+            int expectedStatusCode = 409;
 
             Task task = new Task("task", "task test", StatusProgress.NEW, 10,
                     LocalDateTime.now().withNano(0));
             taskManager.addTask(task);
-            Task task406 = new Task("task406", "task406 test", StatusProgress.NEW, 10,
+            Task task409 = new Task("task409", "task409 test", StatusProgress.NEW, 10,
                     LocalDateTime.now().withNano(0));
 
-            String task406Json = gson.toJson(task406);
+            String task409Json = gson.toJson(task409);
 
             HttpClient httpClient = HttpClient.newHttpClient();
             URI url = URI.create("http://localhost:8080/tasks");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .header("Content-type", "application/json")
                     .uri(url)
-                    .POST(HttpRequest.BodyPublishers.ofString(task406Json))
+                    .POST(HttpRequest.BodyPublishers.ofString(task409Json))
                     .build();
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
@@ -278,10 +277,11 @@ class HttpTaskServerTest {
         }
 
         @Test
-        @DisplayName("Проверяем ответ сервера (404) - эндпоинт 'GET /tasks', запрос всех Tasks, когда список пуст.")
+        @DisplayName("Проверяем ответ сервера (200) - эндпоинт 'GET /tasks', запрос всех Tasks, когда список пуст.")
         void endpointTasks_Get_All_Tasks_List_Empty_Test() throws IOException, InterruptedException {
             //Given
-            int expectedStatusCode = 404;
+            int expectedStatusCode = 200;
+            int expectedSize = 0;
 
             HttpClient httpClient = HttpClient.newHttpClient();
             URI url = URI.create("http://localhost:8080/tasks");
@@ -292,8 +292,11 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
+
+            TypeToken<ArrayList<Task>> collectionType = new TypeToken<>(){};
+            ArrayList<Task> tasksFromServer = gson.fromJson(response.body(), collectionType);
+            assertEquals(expectedSize, tasksFromServer.size());
         }
 
         @Test
@@ -323,7 +326,7 @@ class HttpTaskServerTest {
         @DisplayName("Проверяем эндпоинт 'DELETE /subtasks{id}' - удаление Subtask.")
         void endpointSubtasks_Delete_Subtask_Test() throws IOException, InterruptedException {
             //Given
-            int expectedStatusCode = 200;
+            int expectedStatusCode = 204;
 
             Epic epic = new Epic("epic", "epic");
             taskManager.addEpic(epic);
@@ -385,7 +388,7 @@ class HttpTaskServerTest {
         @DisplayName("Проверяем эндпоинт 'POST /subtasks' - обновление Subtask.")
         void endpointSubtasks_Update_Subtask_Test() throws IOException, InterruptedException {
             //Given
-            int expectedStatusCode = 201;
+            int expectedStatusCode = 200;
             StatusProgress expectedStatusProgress = StatusProgress.IN_PROGRESS;
 
             Epic epic = new Epic("epic", "epic");
@@ -507,24 +510,24 @@ class HttpTaskServerTest {
         @DisplayName("Проверяем ответ сервера (406) - эндпоинт 'POST /subtasks' нельзя добавить Subtask пересекающийся по времени.")
         void endpointSubtasks_Add_Subtask_Has_Time_Intersect_Test() throws IOException, InterruptedException {
             //Given
-            int expectedStatusCode = 406;
+            int expectedStatusCode = 409;
 
             Epic epic = new Epic("epic", "epic");
             taskManager.addEpic(epic);
             Subtask subtask1 = new Subtask("subtask1", "test subtask1", StatusProgress.NEW,
                     epic.getIdNumber(),10, LocalDateTime.now().withNano(0));
-            Subtask subtask406 = new Subtask("subtask406", "test subtask406", StatusProgress.NEW,
+            Subtask subtask409 = new Subtask("subtask409", "test subtask409", StatusProgress.NEW,
                     epic.getIdNumber(),10, LocalDateTime.now().withNano(0));
             taskManager.addSubtask(subtask1);
 
-            String subtask406Json = gson.toJson(subtask406);
+            String subtask409Json = gson.toJson(subtask409);
 
             HttpClient httpClient = HttpClient.newHttpClient();
             URI url = URI.create("http://localhost:8080/subtasks");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .header("Content-type", "application/json")
                     .uri(url)
-                    .POST(HttpRequest.BodyPublishers.ofString(subtask406Json))
+                    .POST(HttpRequest.BodyPublishers.ofString(subtask409Json))
                     .build();
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
@@ -561,10 +564,11 @@ class HttpTaskServerTest {
         }
 
         @Test
-        @DisplayName("Проверяем ответ сервера (404) - эндпоинт 'GET /subtasks', запрос всех Subtasks, когда список пуст.")
+        @DisplayName("Проверяем ответ сервера (200) - эндпоинт 'GET /subtasks', запрос всех Subtasks, когда список пуст.")
         void endpointSubtasks_Get_All_Subtasks_List_Empty_Test() throws IOException, InterruptedException {
             //Given
-            int expectedStatusCode = 404;
+            int expectedStatusCode = 200;
+            int expectedSize = 0;
 
             HttpClient httpClient = HttpClient.newHttpClient();
             URI url = URI.create("http://localhost:8080/subtasks");
@@ -575,8 +579,11 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
+
+            TypeToken<ArrayList<Subtask>> collectionType = new TypeToken<>(){};
+            ArrayList<Subtask> subtasksFromServer = gson.fromJson(response.body(), collectionType);
+            assertEquals(expectedSize, subtasksFromServer.size());
         }
 
         @Test
@@ -606,7 +613,7 @@ class HttpTaskServerTest {
         @DisplayName("Проверяем эндпоинт 'DELETE /epics{id}' - удаление Epic.")
         void endpointEpics_Delete_Epic_Test() throws IOException, InterruptedException {
             //Given
-            int expectedStatusCode = 200;
+            int expectedStatusCode = 204;
 
             Epic epic = new Epic("epic", "epic");
             taskManager.addEpic(epic);
@@ -620,7 +627,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
             assertThrows(RuntimeException.class, () -> taskManager.getEpicByIdNumber(epic.getIdNumber()));
         }
@@ -821,10 +827,11 @@ class HttpTaskServerTest {
         }
 
         @Test
-        @DisplayName("Проверяем ответ сервера (404) - эндпоинт 'GET /epics', запрос всех Epics, когда список пуст.")
+        @DisplayName("Проверяем ответ сервера (200) - эндпоинт 'GET /epics', запрос всех Epics, когда список пуст.")
         void endpointEpics_Get_All_Epics_List_Empty_Test() throws IOException, InterruptedException {
             //Given
-            int expectedStatusCode = 404;
+            int expectedStatusCode = 200;
+            int expectedSize = 0;
 
             HttpClient httpClient = HttpClient.newHttpClient();
             URI url = URI.create("http://localhost:8080/epics");
@@ -835,8 +842,11 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
+
+            TypeToken<ArrayList<Epic>> collectionType = new TypeToken<>(){};
+            ArrayList<Epic> epicsFromServer = gson.fromJson(response.body(), collectionType);
+            assertEquals(expectedSize, epicsFromServer.size());
         }
 
         @Test
@@ -932,7 +942,7 @@ class HttpTaskServerTest {
         @DisplayName("Проверяем ответ сервера (400) - эндпоинт '/history', но с методом 'DELETE'.")
         void endpointHistory_But_Delete_Test() throws IOException, InterruptedException {
             //Given
-            int expectedStatusCode = 400;
+            int expectedStatusCode = 405;
 
             HttpClient httpClient = HttpClient.newHttpClient();
             URI url = URI.create("http://localhost:8080/history");
@@ -1024,7 +1034,7 @@ class HttpTaskServerTest {
         @DisplayName("Проверяем ответ сервера (400) - эндпоинт '/prioritized', но с методом 'DELETE'.")
         void endpointPrioritized_But_Delete_Test() throws IOException, InterruptedException {
             //Given
-            int expectedStatusCode = 400;
+            int expectedStatusCode = 405;
 
             HttpClient httpClient = HttpClient.newHttpClient();
             URI url = URI.create("http://localhost:8080/prioritized");
