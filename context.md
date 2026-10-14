@@ -6,7 +6,7 @@ Backend-сервис для управления задачами по мето�
 учебного Яндекс Практикума, в процессе доработки.
 
 Репозиторий: https://github.com/vd89zen/java-kanban
-Активная ветка: `develop-stage-3-http` (этапы 0-1-2 закрыты, этап 3 в работе).
+Активная ветка: `develop-stage-3-http` (этапы 0-1-2-3 закрыты, этап 4 следующий).
 
 **Стек:** Java 17+, `com.sun.net.httpserver.HttpServer`, Gson, Maven, JUnit 5,
 SLF4J + Logback.
@@ -31,7 +31,7 @@ SLF4J + Logback.
 - `groupId` — `ru.yandex.practicum`
 - `artifactId` — `java-kanban`
 - `version` — `0.2.0-SNAPSHOT`
-- `finalName` — `java-kanban` (jar без версии: `target/java-kanban.jar`)
+- `finalName` — `java-kanban` (`target/java-kanban.jar`)
 - `main.class` — `ru.yandex.practicum.java.tasktracker.TaskTrackerApplication`
 - `maven.compiler.release` — 17 (НЕ `source`/`target`)
 
@@ -127,21 +127,21 @@ ResultOfOperation addTask(Task)
 Task getTaskByIdNumber(int)                    // throws NotFoundException
 ResultOfOperation removeTaskByIdNumber(int)    // throws NotFoundException
 ResultOfOperation updateTask(Task)             // throws NotFoundException
-ArrayList<Task> getAllTasks()                  // throws NotFoundException
+ArrayList<Task> getAllTasks()                  // 200 + [] на пустом; без throws
 ResultOfOperation removeAllTasks()
 ResultOfOperation addEpic(Epic)
 Epic getEpicByIdNumber(int)                    // throws NotFoundException
 ResultOfOperation removeEpicByIdNumber(int)
 ResultOfOperation updateEpicName(int, String)
 ResultOfOperation updateEpicDescription(int, String)
-ArrayList<Subtask> getAllSubtasksFromEpic(int) // throws NotFoundException
-ArrayList<Epic> getAllEpics()                  // throws NotFoundException
+ArrayList<Subtask> getAllSubtasksFromEpic(int) // throws NotFoundException если эпика нет
+ArrayList<Epic> getAllEpics()                  // 200 + [] на пустом
 ResultOfOperation removeAllEpics()
 ResultOfOperation addSubtask(Subtask)
 Subtask getSubtaskByIdNumber(int)              // throws NotFoundException
 ResultOfOperation removeSubtaskByIdNumber(int) // throws NotFoundException
 ResultOfOperation updateSubtask(Subtask)       // throws NotFoundException
-ArrayList<Subtask> getAllSubtasks()            // throws NotFoundException
+ArrayList<Subtask> getAllSubtasks()            // 200 + [] на пустом
 ResultOfOperation removeAllSubtasks()
 ```
 
@@ -156,8 +156,11 @@ ArrayList<AbstractTask> getHistory()
 ### `InMemoryTaskManager`
 
 Все методы — из `TaskManager`. Поля (protected): `allIdInWork`, `tasks`, `epics`,
-`subtasks`, `prioritizedTasks`. Поля `taskForWork`/`epicForWork`/`subtaskForWork`
-удалены в этапе 2.
+`subtasks`, `prioritizedTasks`.
+
+`getAllTasks` / `getAllEpics` / `getAllSubtasks` **не бросают** `NotFoundException`
+на пустой коллекции — возвращают пустой список. `getAllSubtasksFromEpic` бросает
+`NotFoundException` только если эпик не существует; если эпик есть, но подзадач нет — `[]`.
 
 ### `FileBackedTaskManager extends InMemoryTaskManager`
 
@@ -206,8 +209,8 @@ int hashCode()
 `durationInMinutes` (Duration), `startDateTime` (LocalDateTime).
 
 Default-конструктор: `idNumber = -1`, `durationInMinutes = Duration.ZERO`.
-`Gson` десериализует через этот конструктор, поэтому при POST без `id`
-получаем `idNumber = -1` — хендлеры нормализуют его в `0` перед `addXxx`.
+Gson десериализует через этот конструктор, поэтому при POST без `id`
+получаем `idNumber = -1` — хендлеры нормализуют в `0` перед `addXxx`.
 
 ```
 Optional<String> getName()
@@ -225,20 +228,18 @@ Optional<LocalDateTime> getEndDateTime()
 
 ### `Task extends AbstractTask`
 
-10 конструкторов: без id / с id × (name, description, status) + опционально
-startDateTime / durationInMinutes / оба. Переопределены `setStatusProgress`,
-`setDurationInMinutes`, `setStartDateTime`, `resetStartDateTime`, `toString`,
-`equals`, `hashCode`.
+10 конструкторов. Переопределены `setStatusProgress`, `setDurationInMinutes`,
+`setStartDateTime`, `resetStartDateTime`, `toString`, `equals`, `hashCode`.
 
 ### `Subtask extends AbstractTask`
 
-То же + `parentEpicIdNumber`. Валидация родителя вынесена в приватный
-статический `validateParentEpicId(int)`, который вызывается из всех 8 конструкторов.
+То же + `parentEpicIdNumber`. Валидация родителя — приватный статический
+`validateParentEpicId(int)`, вызывается из всех 8 конструкторов.
 
 ### `Epic extends AbstractTask`
 
-Приватный вложенный `SubtaskFields` (4 поля: status, duration, start, end).
-`SubtaskFields` имеет `equals`/`hashCode` (добавлено в этапе 1).
+Приватный вложенный `SubtaskFields` (status, duration, start, end) с
+`equals`/`hashCode`.
 
 ```
 ResultOfOperation addSubtask(Subtask)
@@ -258,25 +259,42 @@ void start()   // log.info("HTTP server started on port {}", port)
 void stop()    // log.info("HTTP server stopped")
 ```
 
-Порт читается из `AppConfig.getServerPort()`.
+Порт из `AppConfig.getServerPort()`.
 
 ### `BaseHttpHandler`
 
+Константа `CONTENT_TYPE_JSON = "application/json;charset=utf-8"`.
+
 ```
 BaseHttpHandler(TaskManager)
-protected void sendText(HttpExchange, String)             // 200 + application/json
-protected void sendCreated(HttpExchange, String)          // 201
-protected void sendNotFound(HttpExchange, String)         // 404
-protected void sendHasInteractions(HttpExchange, String)  // 406 (в этапе 3 → 409)
-protected void sendBadRequest(HttpExchange, String)       // 400
-protected void sendError(HttpExchange, String)            // 500
+protected void sendText(HttpExchange, String)                                       // 200
+protected void sendCreated(HttpExchange, String)                                    // 201 (Location ставит хендлер)
+protected void sendNoContent(HttpExchange)                                          // 204, без тела
+protected void sendNotFound(HttpExchange, String)                                   // 404
+protected void sendBadRequest(HttpExchange, String)                                 // 400
+protected void sendHasInteractions(HttpExchange, String)                            // 406 (не используется)
+protected void sendConflict(HttpExchange, String)                                   // 409
+protected void sendMethodNotAllowed(HttpExchange, String, String allowedMethods)    // 405 + Allow
+protected void sendUnsupportedMediaType(HttpExchange, String)                       // 415
+protected void sendError(HttpExchange, String)                                      // 500
 protected void writeResponse(HttpExchange, String, int)
 ```
 
 ### Хендлеры
 
 Все наследуют `BaseHttpHandler`, реализуют `HttpHandler.handle(HttpExchange)`.
-В ветке создания (`id <= 0`) нормализуют `taskFromJson.setIdNumber(0)` перед `addXxx`.
+
+**Общее поведение POST:**
+- `idNumber <= 0` → создание (нормализуют `setIdNumber(0)`, вызывают `addXxx`,
+  при успехе отдают `201` + `Location: /{resource}/{id}`).
+- `idNumber > 0` → обновление, при успехе отдают `200 OK` (кроме `EpicsHandler` —
+  там update запрещён, `400`).
+
+**DELETE** (Tasks / Subtasks / Epics): `204 No Content`.
+**Неверный Content-Type:** `415` (в `Tasks`, `Subtasks`, `Epics`).
+**Неподдерживаемый метод:** `405` + заголовок `Allow` (во всех пяти).
+**Пересечение интервалов:** `409` (в `Tasks`, `Subtasks`).
+**Пути GET:** неверный путь — `400` (в `History`, `Prioritized` тоже).
 
 ### `CommaSeparatedValuesCreateProcess`
 
@@ -289,97 +307,122 @@ String getHeadersForCSV()
 ```
 
 `setFieldsFromStrings` проверяет `fields.length >= 10` и ловит `NumberFormatException`
-по каждому числовому полю (добавлено в этапе 1).
+по каждому числовому полю.
 
 Заголовок CSV: `id,type,name,description,statusProgress,parentEpic,childSubtasks,durationInMinutes,startDateTime,endDateTime`.
-Плейсхолдеры: `SKIP` (поле неприменимо), `EMPTY` (нет значения).
+Плейсхолдеры: `SKIP`, `EMPTY`.
 
 ### Enums
 
 - `StatusProgress`: `NEW`, `IN_PROGRESS`, `DONE`.
 - `TypesTasks`: `TASK`, `EPIC`, `SUBTASK`.
-- `HttpResponseCode`: `OK(200)`, `CREATED(201)`, `BAD_REQUEST(400)`,
-  `NOT_FOUND(404)`, `NOT_ACCEPTABLE(406)`, `INTERNAL_SERVER_ERROR(500)`.
-  В этапе 3 добавим 204, 405, 409, 415.
-- `ResultOfOperation`: 13 значений — `SUCCESS`, `ERROR_ID_LESS_ZERO`,
-  `ERROR_OBJECT_NULL`, `ERROR_OBJECT_FIELDS_NULL`, `ERROR_OBJECT_NOT_FOUND`,
-  `ERROR_OBJECT_ALREADY_EXISTS`, `ERROR_OBJECT_ILLEGAL`, `ERROR_SUBTASKS_NOT_EMPTY`,
-  `ERROR_MISMATCH_PARENT_ID`, `ERROR_NO_AVAILABLE_ID`, `ERROR_DURATION_LESS_ZERO`,
-  `ERROR_START_NOT_SET`, `ERROR_INTERSECT_TIME`.
+- `HttpResponseCode`: `OK(200)`, `CREATED(201)`, `NO_CONTENT(204)`,
+  `BAD_REQUEST(400)`, `NOT_FOUND(404)`, `METHOD_NOT_ALLOWED(405)`,
+  `NOT_ACCEPTABLE(406)`, `CONFLICT(409)`, `UNSUPPORTED_MEDIA_TYPE(415)`,
+  `INTERNAL_SERVER_ERROR(500)`.
+  `NOT_ACCEPTABLE` пока остаётся в enum, но `sendHasInteractions` не вызывается —
+  чистится в этапе 4.
+- `ResultOfOperation`: 13 значений.
 
 ## Что уже сделано
 
 ### Этапы 0-1-2 закрыты (merge PR #8, тег `v0.2-fixes`)
 
 **Этап 0 — Maven:**
-- Добавлен `pom.xml`, Maven Wrapper, `.gitattributes`.
-- Исходники в Maven-layout: `src/main/java/...`, `src/test/java/...`.
+- `pom.xml`, Maven Wrapper, `.gitattributes`.
+- Исходники в Maven-layout.
 - `Main` → `TaskTrackerApplication`.
-- `logback.xml` (заготовка логирования).
+- `logback.xml`.
 - Удалены `lib/`, `out/`.
 
 **Этап 1 — баг-фиксы:**
-- `AbstractTask()` — `durationInMinutes = Duration.ZERO` (было `null` → NPE).
-- `Epic.SubtaskFields` — добавлены `equals`/`hashCode`.
-- `CommaSeparatedValuesCreateProcess.setFieldsFromStrings` — bounds-check + обработка
-  `NumberFormatException`.
+- `AbstractTask()`: `durationInMinutes = Duration.ZERO` (было `null` → NPE).
+- `Epic.SubtaskFields` — `equals`/`hashCode`.
+- `CommaSeparatedValuesCreateProcess.setFieldsFromStrings` — bounds-check.
 - `AbstractTaskDeserializer` — `JsonParseException` при отсутствии `type`.
-- `LinkedHashMapCustom.createCopy` — убрана мёртвая проверка `if (this == null)`.
-- `toString` в `Task`/`Epic`/`Subtask`/`TextForGson` — закрыта фигурная скобка.
-- `Subtask` — дедупликация валидации родителя (`validateParentEpicId`).
-- `System.out` → SLF4J (`HttpTaskServer`, `TaskTrackerApplication`).
+- `LinkedHashMapCustom.createCopy` — убрана мёртвая проверка.
+- `toString` в `Task`/`Epic`/`Subtask`/`TextForGson` — закрыта скобка.
+- `Subtask` — дедупликация валидации родителя.
+- `System.out` → SLF4J.
 
 **Этап 2 — code smells:**
-- `AppConfig` — чтение порта и пути к данным из env/sysprop.
-- `InMemoryTaskManager` — убраны поля `taskForWork`/`epicForWork`/`subtaskForWork`.
+- `AppConfig` — env/sysprop.
+- `InMemoryTaskManager` — убраны mutable-поля `taskForWork`/`epicForWork`/`subtaskForWork`.
 - `FileBackedTaskManager.save` — сортировка по id.
 - `DataForUserScenario` — удалён.
-- `getAllSubtasksFromEpic` — через `epic.getSubtasksIdNumber()`, проверка существования эпика.
+- `getAllSubtasksFromEpic` — через `epic.getSubtasksIdNumber()`.
 - `ManagersUtil` — перегруженный `getFileBackedTaskManager(File)`.
 
-**Бонус (нашли в ручных проверках):**
-- POST без `id` (или с `id <= 0`) создаёт ресурс, а не падает в update.
-  В хендлерах три места с `if (idNumber <= 0) { taskFromJson.setIdNumber(0); addXxx(...); }`.
-- NPE в `FileBackedTaskManager.save` для файла без родителя (`tasks.csv` в CWD).
-  Теперь `Files.createDirectories` вызывается только если `parentPath != null`.
+**Бонус (из ручных проверок):**
+- POST без `id` создаёт ресурс.
+- NPE в `FileBackedTaskManager.save` для файла без родителя.
 
-**Проверено:**
-- `./mvnw clean test` — 200 tests, BUILD SUCCESS.
-- `java -jar target/java-kanban.jar` — сервер стартует, POST/GET работают, `tasks.csv` создаётся.
-- `SERVER_PORT=9090` и `DATA_FILE=./custom.csv` — читаются из env.
+### Этап 3 закрыт (ветка `develop-stage-3-http`, ждёт merge)
+
+**Коды и хелперы:**
+- `HttpResponseCode`: добавлены `NO_CONTENT(204)`, `METHOD_NOT_ALLOWED(405)`,
+  `CONFLICT(409)`, `UNSUPPORTED_MEDIA_TYPE(415)`.
+- `BaseHttpHandler`: константа `CONTENT_TYPE_JSON`, новые методы
+  `sendNoContent`, `sendConflict`, `sendMethodNotAllowed` (с `Allow`),
+  `sendUnsupportedMediaType`. Content-Type ошибок переведён с
+  `application/problem+json` на `application/json`.
+
+**Семантика:**
+- `POST` создание → `201 Created` + `Location: /{resource}/{id}`.
+- `POST` обновление → `200 OK` (в `Tasks` и `Subtasks`).
+- `DELETE` → `204 No Content` (без тела).
+- Пересечение интервалов → `409 Conflict` (было `406`).
+- Неверный `Content-Type` → `415 Unsupported Media Type` (было `400`).
+- Неподдерживаемый метод → `405 Method Not Allowed` + `Allow` (было `400`).
+- `GET /tasks | /subtasks | /epics` на пустом списке → `200 OK` + `[]`
+  (было `404`). `NotFoundException` остаётся только для «по id не найдено».
+- `getAllSubtasksFromEpic` — пустой эпик → `[]`, несуществующий → `404`.
+
+**Тесты:** синхронизированы под новые коды и поведение.
+
+**Проверено:** `./mvnw clean test` — BUILD SUCCESS. Ручные curl-проверки через
+два терминала — POST/GET/DELETE работают, файл `tasks.csv` создаётся.
 
 ## Что делаем сейчас
 
-**Активный этап:** Этап 3 — HTTP-семантика.
-**Ветка:** `develop-stage-3-http`.
+**Активный этап:** Этап 4 — рефакторинг хранилища.
+**Ветка:** будет `develop-stage-4-storage` (создать от main после merge `v0.3-http`).
 
-### Этап 3 — список правок
+### Этап 4 — план
 
-1. `HttpResponseCode`: добавить `NO_CONTENT(204)`, `METHOD_NOT_ALLOWED(405)`,
-   `CONFLICT(409)`, `UNSUPPORTED_MEDIA_TYPE(415)`. Убрать `NOT_ACCEPTABLE(406)`,
-   если больше не используется.
-2. `BaseHttpHandler`: новые `sendNoContent`, `sendMethodNotAllowed` (с заголовком `Allow`),
-   `sendConflict`, `sendUnsupportedMediaType`.
-3. `Content-Type` всех ответов об ошибках → `application/json` (не `application/problem+json`).
-4. `POST` создание → `201 Created` + заголовок `Location: /<resource>/{id}`.
-   `POST` обновление (id > 0) → `200 OK` (сейчас 201 на оба случая).
-5. `DELETE` → `204 No Content`, пустое тело (сейчас 200 + тело).
-6. Пересечение интервалов → `409 Conflict` (сейчас `406 Not Acceptable`).
-7. Неверный `Content-Type` → `415 Unsupported Media Type` (сейчас 400).
-8. Неподдерживаемый метод → `405 Method Not Allowed` + `Allow` (сейчас 400).
-9. Пустой список `GET /tasks|/subtasks|/epics` → `200 OK` + `[]`
-   (сейчас 404). `NotFoundException` остаётся только для «по id не найдено».
+1. Ввести интерфейс `TaskStorage`:
+   ```
+   void save(Collection<Task> tasks, Collection<Epic> epics, Collection<Subtask> subtasks)
+   LoadedState load()
+   ```
+   `LoadedState` — record с тремя коллекциями (или отдельные `loadTasks`/`loadEpics`/
+   `loadSubtasks` — решаем по ходу).
+2. Реализации:
+    - `InMemoryStorage` — no-op.
+    - `CsvStorage` — перенос логики CSV из `FileBackedTaskManager`.
+3. `InMemoryTaskManager` принимает `TaskStorage` в конструкторе (может быть `null`
+   или `InMemoryStorage`). После каждой успешной мутации — `storage.save(...)`.
+4. `FileBackedTaskManager` удаляется как класс.
+   Фабрика: `ManagersUtil.getFileBacked(File)` → `new InMemoryTaskManager(new CsvStorage(file))`.
+5. Восстановление из файла: в конструкторе (или отдельным `init()`) вызывается
+   `storage.load()`, коллекции наполняются.
 
-### Дальнейшие этапы (вкратце)
+### Дальнейшие этапы
 
-- **Этап 4 (хранилище):** `TaskStorage` + `CsvStorage`, `InMemoryStorage`,
-  композиция вместо наследования, `FileBackedTaskManager` удаляется.
 - **Этап 5 (потокобезопасность):** `ConcurrentHashMap` + точечные `synchronized`,
   `ExecutorService` в `HttpTaskServer`.
 - **Этап 6 (API, опционально):** пагинация, `/health`, `/version`, OpenAPI-спека.
 - **Этап 7 (тесты):** переработка — см. отдельный план.
 - **Этап 8 (инфраструктура, опционально):** Checkstyle, SpotBugs, JaCoCo,
   GitHub Actions, Dockerfile, docker-compose.
+
+### Открытые мелочи
+
+- `BaseHttpHandler.sendHasInteractions` и `HttpResponseCode.NOT_ACCEPTABLE` больше
+  не используются — удалить.
+- `HistoryHandler` и `PrioritizedHandler` используют `sendBadRequest` на неверный
+  путь — это ок, оставляем 400.
+- В тестах всё ещё есть `System.out.println` — убираются в этапе 7.
 
 ## Принятые решения
 
@@ -388,25 +431,24 @@ String getHeadersForCSV()
 | 1 | Система сборки: Maven, минимальный `pom.xml` |
 | 2 | Логирование: SLF4J + Logback |
 | 3 | Путь к данным: `./tasks.csv` через env/sysprop |
-| 4 | `DataForUserScenario` — удалён (этап 2) |
-| 5 | `DELETE` → 204 No Content (этап 3) |
-| 6 | Пересечение интервалов → 409 Conflict (этап 3) |
-| 7 | Неверный `Content-Type` → 415 (этап 3) |
-| 8 | `Content-Type` ошибок → `application/json` (этап 3) |
-| 9 | Пустой список → 200 + `[]` (этап 3) |
+| 4 | `DataForUserScenario` — удалён |
+| 5 | `DELETE` → 204 No Content |
+| 6 | Пересечение интервалов → 409 Conflict |
+| 7 | Неверный `Content-Type` → 415 |
+| 8 | `Content-Type` ошибок → `application/json` |
+| 9 | Пустой список → 200 + `[]` |
 | 10 | Хранилище: `TaskStorage` + композиция (этап 4) |
 | 11 | Потокобезопасность: `ConcurrentHashMap` + `synchronized` (этап 5) |
 
 ## Модель ветвления и тегов
 
-- Префикс веток: **`develop-`**.
+- Префикс веток: `develop-`.
 - Каждый этап — своя ветка `develop-stage-X-...`.
 - После этапа: PR на GitHub (base `main`), merge commit, тег на merge-коммит.
 
 **Теги:**
-- `v0.1-before-refactor` — на main (точка старта).
-- `v0.2-fixes` — на main (этапы 0-1-2).
-- `v0.3-http` — после этапа 3.
+- `v0.1-before-refactor`, `v0.2-fixes` — на main.
+- `v0.3-http` — после merge текущей ветки.
 - `v0.4-storage`, `v0.5-concurrency`, `v0.6-api`, `v0.7-tests`, `v1.0-portfolio` — в будущем.
 
 ## Соглашения по коду и тестам
@@ -414,32 +456,34 @@ String getHeadersForCSV()
 - Отвечать по-русски.
 - **Тесты:**
     - `@Nested`, `@DisplayName`, имена `methodName_Should_ExpectedBehavior_Test`.
-    - `assertThrows` — только с конкретными типами исключений, не `RuntimeException`.
-    - Без `System.out.println` (в этапе 7 убираем отладочные print-ы).
-    - Детерминированное время (`LocalDateTime.of`), не `now()`.
-    - `@AfterEach` для очистки temp-файлов.
-    - HTTP-тесты — на порту 0, проверять тело ответа.
+    - `assertThrows` — только с конкретными типами исключений.
+    - Без `System.out.println` (в этапе 7 убираем).
+    - Детерминированное время, не `now()` (в этапе 7).
+    - `@AfterEach` для temp-файлов (в этапе 7).
+    - HTTP-тесты — на порту 0 (в этапе 7).
 - **Code fence:** для вложенных — четыре бэктика снаружи.
 - Файлы присылаются целиком; не выдумывать методы/поля, которых нет в разделе
   «Ключевые сигнатуры».
-- **Gson работает через no-arg конструктор + reflection.** Поля, не указанные
-  в JSON, остаются такими, какими их сделал no-arg конструктор (`idNumber = -1`,
+- **Gson работает через no-arg конструктор + reflection.** Поля из JSON без явного
+  значения остаются такими, какими их сделал no-arg конструктор (`idNumber = -1`,
   `durationInMinutes = Duration.ZERO`). Валидации из конструкторов с аргументами
-  при десериализации не срабатывают — это надо учитывать.
+  при десериализации не срабатывают.
 
 ## Окружение и известные грабли
 
 - Windows, IDEA, JDK 21 (собираем под 17).
 - Maven не в PATH системного bash. Используем `./mvnw ...` из корня.
 - Пути в bash — только прямые слэши: `git add src/main`, не `src\main`.
-- В Surefire прописан `argLine` с UTF-8 для stdout/stderr — иначе на Windows
-  русские сообщения превращаются в кракозябры.
+- В Surefire прописан `argLine` с UTF-8 — избавляет от кракозябр в форке.
+  При запуске из IDEA-панели Maven — `JAVA_TOOL_OPTIONS` в
+  `Settings → Build → Build Tools → Maven → Runner → Environment variables`.
 - `catch_Exception_When_Save_File_Read_Only_Test` нестабилен на Windows —
   судьба решается в этапе 7.
-- `.gitattributes` нормализует `.java` в LF. IDEA на Windows может сохранять CRLF,
-  Git конвертирует при коммите. Warning про CRLF — нормально, содержимое не портится.
+- `.gitattributes` нормализует `.java` в LF. Warning про CRLF — нормально.
 - `idNumber` по умолчанию `-1` (маркер «пустышка»). Gson даёт `-1` при POST без `id`.
   Хендлеры нормализуют в `0` в ветке создания.
+- `mvn clean` может падать с `Failed to delete target` — файл-лок на Windows
+  (IDEA, антивирус, проводник). Лечится закрытием IDEA и `rm -rf target`.
 
 ## Ожидаемое действие от ассистента в новом чате
 
@@ -449,8 +493,8 @@ String getHeadersForCSV()
 3. **Задать уточняющий вопрос:** «На какой стадии этапа мы сейчас? Что уже
    закоммичено, что ещё нет?» — пользователь мог перейти в новый чат посреди работы.
 4. **Дождаться ответа.** Не начинать правки сразу.
-5. **Проверить актуальность.** Если сомнения — попросить пользователя прислать
-   текущие версии файлов, которые предстоит править.
+5. **Проверить актуальность.** Если сомнения — попросить текущие версии файлов,
+   которые предстоит править.
 6. **Не выдумывать методы и поля.** Если нужен метод, а его нет в разделе
    «Ключевые сигнатуры» — попросить файл.
 
@@ -468,5 +512,4 @@ String getHeadersForCSV()
 - Коммиты — лаконичные, но информативные.
 - **Обновление `context.md` в конце каждого этапа:** новая версия подробнее
   предыдущей, заменяет старую (git-история сохранит ревизии).
-- **PLAN.md** — локальный, в `.gitignore`, в репо не публикуется. При
-  необходимости пользователь присылает его отдельно.
+- **PLAN.md** — локальный, в `.gitignore`, в репо не публикуется.
