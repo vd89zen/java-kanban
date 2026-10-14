@@ -156,15 +156,10 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     @Override
-    public ArrayList<Task> getAllTasks() throws NotFoundException {
-        if (tasks.isEmpty()) {
-            throw new NotFoundException("List is empty");
-        }
-
+    public ArrayList<Task> getAllTasks() {
         return tasks.values().stream()
                 .map(Task::new)
-                .collect(Collectors.toCollection(ArrayList::new)
-                );
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     @Override
@@ -264,11 +259,7 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     @Override
-    public ArrayList<Epic> getAllEpics() throws NotFoundException {
-        if (epics.isEmpty()) {
-            throw new NotFoundException("List is empty");
-        }
-
+    public ArrayList<Epic> getAllEpics() {
         return epics.values().stream()
                 .map(Epic::new)
                 .collect(Collectors.toCollection(ArrayList::new));
@@ -280,13 +271,9 @@ public class InMemoryTaskManager implements TaskManager {
             throw new NotFoundException(String.format("Epic (id: %d) for 'get subtasks' not found", epicIdNumber));
         }
 
-        Optional<ArrayList<Integer>> subtaskIdsOptional = epics.get(epicIdNumber).getSubtasksIdNumber();
-
-        if (subtaskIdsOptional.isEmpty()) {
-            throw new NotFoundException("List is empty");
-        }
-
-        return subtaskIdsOptional.get().stream()
+        return epics.get(epicIdNumber).getSubtasksIdNumber()
+                .orElseGet(ArrayList::new)
+                .stream()
                 .map(subtasks::get)
                 .filter(Objects::nonNull)
                 .map(Subtask::new)
@@ -415,15 +402,10 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     @Override
-    public ArrayList<Subtask> getAllSubtasks() throws NotFoundException {
-        if (epics.isEmpty() || subtasks.isEmpty()) {
-            throw new NotFoundException("List is empty");
-        }
-
+    public ArrayList<Subtask> getAllSubtasks() {
         return subtasks.values().stream()
                 .map(Subtask::new)
-                .collect(Collectors.toCollection(ArrayList::new)
-                );
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     @Override

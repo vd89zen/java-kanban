@@ -216,18 +216,12 @@ abstract class TaskManagerTest<T extends TaskManager> {
         @DisplayName("Проверяем удаление всех Task")
         void removeAllTasks_Test() {
             //Given
-            System.out.println("\nTasks BEFORE test 'Проверяем удаление всех Task':");
-            System.out.println(taskManager.getAllTasks());
+            int expectedSize = 0;
             //When
             taskManager.removeAllTasks();
             //Then
-            System.out.println("\nTasks AFTER test 'Проверяем удаление всех Task':");
-            try {
-                taskManager.getAllTasks();
-            } catch (NotFoundException e) {
-                System.out.println(e.getMessage());
-            }
-            assertThrows(RuntimeException.class, () -> taskManager.getAllTasks());
+            int actualSize = taskManager.getAllTasks().size();
+            assertEquals(expectedSize, actualSize);
         }
 
         @Test
@@ -449,19 +443,15 @@ abstract class TaskManagerTest<T extends TaskManager> {
         @DisplayName("Проверяем удаление всех Epic (и как следствие Subtask)")
         void removeAllEpics_Test() {
             //Given
-            System.out.println("\nEpic/Subtasks BEFORE test 'Проверяем удаление всех Epic (и как следствие Subtask)':");
-            System.out.println(taskManager.getAllEpics());
-            System.out.println(taskManager.getAllSubtasks());
+            int expectedEpicsSize = 0;
+            int expectedSubtasksSize = 0;
             //When
             taskManager.removeAllEpics();
-            System.out.println("\nEpic/Subtasks AFTER test 'Проверяем удаление всех Epic':");
-            try {
-                taskManager.getAllEpics();
-            } catch (NotFoundException e) {
-                System.out.println(e.getMessage());
-            }
             //Then
-            assertThrows(RuntimeException.class, () -> taskManager.getAllEpics());
+            int actualEpicsSize = taskManager.getAllEpics().size();
+            int actualSubtasksSize = taskManager.getAllSubtasks().size();
+            assertEquals(expectedEpicsSize, actualEpicsSize);
+            assertEquals(expectedSubtasksSize, actualSubtasksSize);
         }
 
         @Test
@@ -644,10 +634,13 @@ abstract class TaskManagerTest<T extends TaskManager> {
         @Test
         @DisplayName("Проверяем удаление всех Subtask")
         void removeAllSubtasks_Test() {
+            //Given
+            int expectedSize = 0;
             //When
             taskManager.removeAllSubtasks();
             //Then
-            assertThrows(RuntimeException.class, () -> taskManager.getAllSubtasks());
+            int actualSize = taskManager.getAllSubtasks().size();
+            assertEquals(expectedSize, actualSize);
         }
 
         @Test

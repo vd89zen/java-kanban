@@ -36,11 +36,7 @@ public class TasksHandler extends BaseHttpHandler implements HttpHandler {
                     }
 
                     taskManager.removeTaskByIdNumber(id);
-                    textForGson.setRequest(null);
-                    textForGson.setDone("delete");
-                    textForGson.setTaskType("task");
-                    textForGson.setTaskIdNumber(id);
-                    sendText(httpExchange, gson.toJson(textForGson));
+                    sendNoContent(httpExchange);
                 } else {
                     throw new BadRequestException("For DELETE path must be '/tasks/{id}'");
                 }
@@ -50,7 +46,9 @@ public class TasksHandler extends BaseHttpHandler implements HttpHandler {
             if (requestMethod.equals("POST")) {
                 List<String> contentTypeValues = httpExchange.getRequestHeaders().get("Content-type");
                 if ((contentTypeValues == null) || (contentTypeValues.contains("application/json") == false)) {
-                    throw new BadRequestException("'Content-type' must be application/json");
+                    textForGson.setDetail("'Content-type' must be 'application/json'");
+                    sendUnsupportedMediaType(httpExchange, gson.toJson(textForGson));
+                    return;
                 }
 
                 String requestBody = new String(httpExchange.getRequestBody().readAllBytes(), DEFAULT_CHARSET);
@@ -67,8 +65,9 @@ public class TasksHandler extends BaseHttpHandler implements HttpHandler {
 
                 if (splitPath.length == 2) {
                     textForGson.setTaskType("task");
+                    boolean isCreate = taskFromJson.getIdNumber() <= 0;
 
-                    if (taskFromJson.getIdNumber() <= 0) {
+                    if (isCreate) {
                         taskFromJson.setIdNumber(0);
                         resultOfOperation = taskManager.addTask(taskFromJson);
                         textForGson.setDone("add");
@@ -81,13 +80,18 @@ public class TasksHandler extends BaseHttpHandler implements HttpHandler {
 
                     if (resultOfOperation == ResultOfOperation.SUCCESS) {
                         textForGson.setRequest(null);
-                        sendCreated(httpExchange, gson.toJson(textForGson));
+                        if (isCreate) {
+                            httpExchange.getResponseHeaders().add("Location", "/tasks/" + taskFromJson.getIdNumber());
+                            sendCreated(httpExchange, gson.toJson(textForGson));
+                        } else {
+                            sendText(httpExchange, gson.toJson(textForGson));
+                        }
                     } else {
                         textForGson.setDone(null);
                         textForGson.setDetail(resultOfOperation.name());
                         switch (resultOfOperation) {
                             case ERROR_INTERSECT_TIME:
-                                sendHasInteractions(httpExchange, gson.toJson(textForGson));
+                                sendConflict(httpExchange, gson.toJson(textForGson));
                                 break;
                             case ERROR_OBJECT_NULL:
                             case ERROR_OBJECT_FIELDS_NULL:
@@ -117,7 +121,8 @@ public class TasksHandler extends BaseHttpHandler implements HttpHandler {
                 }
                 return;
             }
-            throw new BadRequestException("Check request and try again. Note: only GET/POST/DELETE are supported");
+            textForGson.setDetail("Method '" + requestMethod + "' is not allowed. Allowed: GET, POST, DELETE");
+            sendMethodNotAllowed(httpExchange, gson.toJson(textForGson), "GET,POST,DELETE");
         } catch (NotFoundException notFoundException) {
             textForGson.setDetail(notFoundException.getMessage());
             sendNotFound(httpExchange, gson.toJson(textForGson));

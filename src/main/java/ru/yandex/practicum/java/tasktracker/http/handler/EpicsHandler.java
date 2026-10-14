@@ -36,11 +36,7 @@ public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
                     }
 
                     taskManager.removeEpicByIdNumber(id);
-                    textForGson.setRequest(null);
-                    textForGson.setDone("delete");
-                    textForGson.setTaskType("epic");
-                    textForGson.setTaskIdNumber(id);
-                    sendText(httpExchange, gson.toJson(textForGson));
+                    sendNoContent(httpExchange);
                 } else {
                     throw new BadRequestException("For DELETE path must be '/epics/{id}'");
                 }
@@ -50,7 +46,9 @@ public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
             if (requestMethod.equals("POST")) {
                 List<String> contentTypeValues = httpExchange.getRequestHeaders().get("Content-type");
                 if ((contentTypeValues == null) || (contentTypeValues.contains("application/json") == false)) {
-                    throw new BadRequestException("'Content-type' must be application/json");
+                    textForGson.setDetail("'Content-type' must be 'application/json'");
+                    sendUnsupportedMediaType(httpExchange, gson.toJson(textForGson));
+                    return;
                 }
 
                 String requestBody = new String(httpExchange.getRequestBody().readAllBytes(), DEFAULT_CHARSET);
@@ -80,6 +78,7 @@ public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
 
                     if (resultOfOperation == ResultOfOperation.SUCCESS) {
                         textForGson.setRequest(null);
+                        httpExchange.getResponseHeaders().add("Location", "/epics/" + taskFromJson.getIdNumber());
                         sendCreated(httpExchange, gson.toJson(textForGson));
                     } else {
                         textForGson.setDone(null);
@@ -116,7 +115,8 @@ public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
                 }
                 return;
             }
-            throw new BadRequestException("Check request and try again. Note: only GET/POST/DELETE are supported");
+            textForGson.setDetail("Method '" + requestMethod + "' is not allowed. Allowed: GET, POST, DELETE");
+            sendMethodNotAllowed(httpExchange, gson.toJson(textForGson), "GET,POST,DELETE");
         } catch (NotFoundException notFoundException) {
             textForGson.setDetail(notFoundException.getMessage());
             sendNotFound(httpExchange, gson.toJson(textForGson));
