@@ -13,7 +13,13 @@ public class AbstractTaskDeserializer implements JsonDeserializer<AbstractTask> 
             throws JsonParseException {
 
         JsonObject jsonObject = json.getAsJsonObject();
-        String type = jsonObject.get("type").getAsString();
+        JsonElement typeElement = jsonObject.get("type");
+
+        if (typeElement == null || typeElement.isJsonNull()) {
+            throw new JsonParseException("Field 'type' is required");
+        }
+
+        String type = typeElement.getAsString();
 
         switch (type) {
             case "TASK":

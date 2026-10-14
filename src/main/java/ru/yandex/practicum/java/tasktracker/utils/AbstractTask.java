@@ -15,16 +15,16 @@ public abstract class AbstractTask {
     protected String description;
     protected StatusProgress statusProgress;
     protected TypesTasks type;
-    protected Duration durationInMinutes; //добавил InMinutes в имя, т.к. по условию длительность в минутах
-    protected LocalDateTime startDateTime; //добавил Date в имя,т.к. по условию у нас и время и дата
+    protected Duration durationInMinutes;
+    protected LocalDateTime startDateTime;
 
     //возможность создания пустышки
     protected AbstractTask() {
         this.idNumber = -1;
         this.name = null;
         this.description = null;
-        this.statusProgress = StatusProgress.NEW;//теперь можно и для эпика дополнить поля и включить в базу Менеджера
-        this.durationInMinutes = null;
+        this.statusProgress = StatusProgress.NEW;
+        this.durationInMinutes = Duration.ZERO;;
         this.startDateTime = null;
     }
 

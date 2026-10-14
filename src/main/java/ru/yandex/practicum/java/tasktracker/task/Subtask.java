@@ -24,87 +24,55 @@ public class Subtask extends AbstractTask {
 
     public Subtask(String name, String description, StatusProgress statusProgress, int parentEpicIdNumber) {
         super(name, description, statusProgress);
-        if (parentEpicIdNumber < 0) {
-            throw new IllegalArgumentException("'parentEpicIdNumber' can't be less zero");
-        } else {
-            this.parentEpicIdNumber = parentEpicIdNumber;
-        }
+        this.parentEpicIdNumber = validateParentEpicId(parentEpicIdNumber);
         type = TypesTasks.SUBTASK;
     }
 
     public Subtask(String name, String description, StatusProgress statusProgress, int parentEpicIdNumber,
                    LocalDateTime startDateTime) {
         super(name, description, statusProgress, startDateTime);
-        if (parentEpicIdNumber < 0) {
-            throw new IllegalArgumentException("'parentEpicIdNumber' can't be less zero");
-        } else {
-            this.parentEpicIdNumber = parentEpicIdNumber;
-        }
+        this.parentEpicIdNumber = validateParentEpicId(parentEpicIdNumber);
         type = TypesTasks.SUBTASK;
     }
 
     public Subtask(String name, String description, StatusProgress statusProgress, int parentEpicIdNumber,
                    long durationInMinutes) {
         super(name, description, statusProgress, durationInMinutes);
-        if (parentEpicIdNumber < 0) {
-            throw new IllegalArgumentException("'parentEpicIdNumber' can't be less zero");
-        } else {
-            this.parentEpicIdNumber = parentEpicIdNumber;
-        }
+        this.parentEpicIdNumber = validateParentEpicId(parentEpicIdNumber);
         type = TypesTasks.SUBTASK;
     }
 
     public Subtask(String name, String description, StatusProgress statusProgress, int parentEpicIdNumber,
                    long durationInMinutes, LocalDateTime startDateTime) {
         super(name, description, statusProgress, durationInMinutes, startDateTime);
-        if (parentEpicIdNumber < 0) {
-            throw new IllegalArgumentException("'parentEpicIdNumber' can't be less zero");
-        } else {
-            this.parentEpicIdNumber = parentEpicIdNumber;
-        }
+        this.parentEpicIdNumber = validateParentEpicId(parentEpicIdNumber);
         type = TypesTasks.SUBTASK;
     }
 
     public Subtask(int idNumber, String name, String description, StatusProgress statusProgress, int parentEpicIdNumber) {
         super(idNumber, name, description, statusProgress);
-        if (parentEpicIdNumber < 0) {
-            throw new IllegalArgumentException("'parentEpicIdNumber' can't be less zero");
-        } else {
-            this.parentEpicIdNumber = parentEpicIdNumber;
-        }
+        this.parentEpicIdNumber = validateParentEpicId(parentEpicIdNumber);
         type = TypesTasks.SUBTASK;
     }
 
     public Subtask(int idNumber, String name, String description, StatusProgress statusProgress,
                    int parentEpicIdNumber, LocalDateTime startDateTime) {
         super(idNumber, name, description, statusProgress, startDateTime);
-        if (parentEpicIdNumber < 0) {
-            throw new IllegalArgumentException("'parentEpicIdNumber' can't be less zero");
-        } else {
-            this.parentEpicIdNumber = parentEpicIdNumber;
-        }
+        this.parentEpicIdNumber = validateParentEpicId(parentEpicIdNumber);
         type = TypesTasks.SUBTASK;
     }
 
     public Subtask(int idNumber, String name, String description, StatusProgress statusProgress,
                    int parentEpicIdNumber, long durationInMinutes) {
         super(idNumber, name, description, statusProgress, durationInMinutes);
-        if (parentEpicIdNumber < 0) {
-            throw new IllegalArgumentException("'parentEpicIdNumber' can't be less zero");
-        } else {
-            this.parentEpicIdNumber = parentEpicIdNumber;
-        }
+        this.parentEpicIdNumber = validateParentEpicId(parentEpicIdNumber);
         type = TypesTasks.SUBTASK;
     }
 
     public Subtask(int idNumber, String name, String description, StatusProgress statusProgress,
                    int parentEpicIdNumber, long durationInMinutes, LocalDateTime startDateTime) {
         super(idNumber, name, description, statusProgress, durationInMinutes, startDateTime);
-        if (parentEpicIdNumber < 0) {
-            throw new IllegalArgumentException("'parentEpicIdNumber' can't be less zero");
-        } else {
-            this.parentEpicIdNumber = parentEpicIdNumber;
-        }
+        this.parentEpicIdNumber = validateParentEpicId(parentEpicIdNumber);
         type = TypesTasks.SUBTASK;
     }
 
@@ -151,6 +119,13 @@ public class Subtask extends AbstractTask {
         return parentEpicIdNumber;
     }
 
+    private static int validateParentEpicId(int parentEpicIdNumber) {
+        if (parentEpicIdNumber < 0) {
+            throw new IllegalArgumentException("'parentEpicIdNumber' can't be less zero");
+        }
+        return parentEpicIdNumber;
+    }
+
     @Override
     public String toString() {
         String descriptionLength;
@@ -165,7 +140,7 @@ public class Subtask extends AbstractTask {
         String endSubtask = getEndDateTime().map(LocalDateTime::toString).orElse("null");
 
         return String.format("%nSubtask{name='%s', description.length='%s', Status Progress='%s', ID number='%d', " +
-                        "parent epic ID number='%d', duration in minutes='%s', start DateTime='%s', end DateTime='%s'",
+                        "parent epic ID number='%d', duration in minutes='%s', start DateTime='%s', end DateTime='%s'}",
                 name, descriptionLength, statusProgressName, idNumber, parentEpicIdNumber, durationInMinutes.toMinutes(),
                 startSubtask, endSubtask);
     }

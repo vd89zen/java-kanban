@@ -196,9 +196,22 @@ public class CommaSeparatedValuesCreateProcess {
     }
 
     private void setFieldsFromStrings(String[] fields) {
-        idNumber = Integer.valueOf(fields[headerId]);
+        final int REQUIRED_COLUMNS = 10;
+
+        if (fields == null || fields.length < REQUIRED_COLUMNS) {
+            throw new RuntimeException("Неверный формат строки CSV: ожидалось " + REQUIRED_COLUMNS
+                    + " колонок, получено " + (fields == null ? "null" : fields.length));
+        }
+
+        try {
+            idNumber = Integer.valueOf(fields[headerId]);
+        } catch (NumberFormatException exception) {
+            throw new RuntimeException("Неверный формат id: '" + fields[headerId] + "'");
+        }
+
         name = fields[headerName];
         description = fields[headerDescription];
+
         switch (fields[headerStatusProgress]) {
             case "NEW":
                 statusProgress = StatusProgress.NEW;
@@ -217,14 +230,27 @@ public class CommaSeparatedValuesCreateProcess {
             case "SKIP":
                 break;
             default:
-                parentEpicIdNumber = Integer.valueOf(fields[headerParentEpic]);
+                try {
+                    parentEpicIdNumber = Integer.valueOf(fields[headerParentEpic]);
+                } catch (NumberFormatException exception) {
+                    throw new RuntimeException("Неверный формат parentEpic: '" + fields[headerParentEpic] + "'");
+                }
         }
 
-        durationInMinutes = Long.valueOf(fields[headerDurationInMinutes]);
+        try {
+            durationInMinutes = Long.valueOf(fields[headerDurationInMinutes]);
+        } catch (NumberFormatException exception) {
+            throw new RuntimeException("Неверный формат durationInMinutes: '" + fields[headerDurationInMinutes] + "'");
+        }
+
         if (fields[headerStartDateTime].equals("EMPTY")) {
             startDateTime = null;
         } else {
-            startDateTime = LocalDateTime.parse(fields[headerStartDateTime]);
+            try {
+                startDateTime = LocalDateTime.parse(fields[headerStartDateTime]);
+            } catch (Exception exception) {
+                throw new RuntimeException("Неверный формат startDateTime: '" + fields[headerStartDateTime] + "'");
+            }
         }
     }
 

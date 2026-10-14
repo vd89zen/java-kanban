@@ -66,7 +66,7 @@ public class TextForGson {
         String taskTypeString = Optional.ofNullable(taskType).orElse("null");
         String detailString = Optional.ofNullable(detail).orElse("null");
 
-        return String.format("%nTextForGson{request='%s', done='%s', taskIdNumber='%s', taskType='%s', detail='%s'",
+        return String.format("%nTextForGson{request='%s', done='%s', taskIdNumber='%s', taskType='%s', detail='%s'}",
                 requestString, doneString, taskIdNumberString, taskTypeString, detailString);
     }
 }

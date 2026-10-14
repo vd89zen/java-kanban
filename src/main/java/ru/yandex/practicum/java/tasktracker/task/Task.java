@@ -107,7 +107,7 @@ public class Task extends AbstractTask {
                 .orElse("null");
 
         return String.format("%nTask{name='%s', description.length='%s', Status Progress='%s', ID number='%d', " +
-                        "duration in minutes='%s', start DateTime='%s', end DateTime='%s'",
+                        "duration in minutes='%s', start DateTime='%s', end DateTime='%s'}",
                 name, descriptionLength, statusProgressName, idNumber, durationInMinutes.toMinutes(), startTask,
                 endTask);
     }

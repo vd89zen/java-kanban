@@ -87,10 +87,6 @@ public class LinkedHashMapCustom {
     }
 
     public LinkedHashMapCustom createCopy() {
-        if (this == null) {
-            return new LinkedHashMapCustom();
-        }
-
         LinkedHashMapCustom copyHistory = new LinkedHashMapCustom();
 
         for (NodeCustom node : this.innerHashMap.values()) {

@@ -38,6 +38,29 @@ public class Epic extends AbstractTask {
             subtaskStartDateTime = subtask.getStartDateTime().orElse(null);
             subtaskEndDateTime = subtask.getEndDateTime().orElse(null);
         }
+
+        @Override
+        public boolean equals(Object object) {
+            if (this == object) {
+                return true;
+            }
+            if (object == null || getClass() != object.getClass()) {
+                return false;
+            }
+
+            SubtaskFields that = (SubtaskFields) object;
+
+            return Objects.equals(subtaskStatusProgress, that.subtaskStatusProgress)
+                    && Objects.equals(subtaskDurationInMinutes, that.subtaskDurationInMinutes)
+                    && Objects.equals(subtaskStartDateTime, that.subtaskStartDateTime)
+                    && Objects.equals(subtaskEndDateTime, that.subtaskEndDateTime);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(subtaskStatusProgress, subtaskDurationInMinutes,
+                    subtaskStartDateTime, subtaskEndDateTime);
+        }
     }
 
     public Epic() {
@@ -219,7 +242,7 @@ public class Epic extends AbstractTask {
         String endEpic = Objects.toString(endDateTime, "null");
 
         return String.format("%nEpic{name='%s', description.length='%s', Status Progress='%s', ID number='%d', " +
-                        "number of subtasks='%s', duration in minutes='%s', start DateTime='%s', end DateTime='%s'",
+                        "number of subtasks='%s', duration in minutes='%s', start DateTime='%s', end DateTime='%s'}",
                 name, descriptionLength, statusProgressName, idNumber, subtasksSize, durationInMinutes.toMinutes(),
                 startEpic, endEpic);
     }
