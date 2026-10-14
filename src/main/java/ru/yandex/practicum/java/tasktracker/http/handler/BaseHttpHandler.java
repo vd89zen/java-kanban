@@ -18,6 +18,8 @@ import java.time.LocalDateTime;
 
 public class BaseHttpHandler {
     protected static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
+    private static final String CONTENT_TYPE_JSON = "application/json;charset=utf-8";
+
     protected final TaskManager taskManager;
     protected Gson gson;
 
@@ -31,32 +33,54 @@ public class BaseHttpHandler {
     }
 
     protected void sendText(HttpExchange httpExchange, String responseText) throws IOException {
-        httpExchange.getResponseHeaders().add("Content-Type", "application/json;charset=utf-8");
+        httpExchange.getResponseHeaders().add("Content-Type", CONTENT_TYPE_JSON);
         writeResponse(httpExchange, responseText, HttpResponseCode.OK.getCode());
     }
 
-    protected void sendNotFound(HttpExchange httpExchange, String responseText) throws IOException {
-        httpExchange.getResponseHeaders().add("Content-Type", "application/problem+json;charset=utf-8");
-        writeResponse(httpExchange, responseText, HttpResponseCode.NOT_FOUND.getCode());
-    }
-
-    protected void sendHasInteractions(HttpExchange httpExchange, String responseText) throws IOException {
-        httpExchange.getResponseHeaders().add("Content-Type", "application/problem+json;charset=utf-8");
-        writeResponse(httpExchange, responseText, HttpResponseCode.NOT_ACCEPTABLE.getCode());
-    }
-
-    protected void sendBadRequest(HttpExchange httpExchange, String responseText) throws IOException {
-        httpExchange.getResponseHeaders().add("Content-Type", "application/problem+json;charset=utf-8");
-        writeResponse(httpExchange, responseText, HttpResponseCode.BAD_REQUEST.getCode());
-    }
-
     protected void sendCreated(HttpExchange httpExchange, String responseText) throws IOException {
-        httpExchange.getResponseHeaders().add("Content-Type", "application/json;charset=utf-8");
+        httpExchange.getResponseHeaders().add("Content-Type", CONTENT_TYPE_JSON);
         writeResponse(httpExchange, responseText, HttpResponseCode.CREATED.getCode());
     }
 
+    protected void sendNoContent(HttpExchange httpExchange) throws IOException {
+        httpExchange.sendResponseHeaders(HttpResponseCode.NO_CONTENT.getCode(), -1);
+        httpExchange.close();
+    }
+
+    protected void sendNotFound(HttpExchange httpExchange, String responseText) throws IOException {
+        httpExchange.getResponseHeaders().add("Content-Type", CONTENT_TYPE_JSON);
+        writeResponse(httpExchange, responseText, HttpResponseCode.NOT_FOUND.getCode());
+    }
+
+    protected void sendBadRequest(HttpExchange httpExchange, String responseText) throws IOException {
+        httpExchange.getResponseHeaders().add("Content-Type", CONTENT_TYPE_JSON);
+        writeResponse(httpExchange, responseText, HttpResponseCode.BAD_REQUEST.getCode());
+    }
+
+    protected void sendHasInteractions(HttpExchange httpExchange, String responseText) throws IOException {
+        httpExchange.getResponseHeaders().add("Content-Type", CONTENT_TYPE_JSON);
+        writeResponse(httpExchange, responseText, HttpResponseCode.NOT_ACCEPTABLE.getCode());
+    }
+
+    protected void sendConflict(HttpExchange httpExchange, String responseText) throws IOException {
+        httpExchange.getResponseHeaders().add("Content-Type", CONTENT_TYPE_JSON);
+        writeResponse(httpExchange, responseText, HttpResponseCode.CONFLICT.getCode());
+    }
+
+    protected void sendMethodNotAllowed(HttpExchange httpExchange, String responseText,
+                                        String allowedMethods) throws IOException {
+        httpExchange.getResponseHeaders().add("Content-Type", CONTENT_TYPE_JSON);
+        httpExchange.getResponseHeaders().add("Allow", allowedMethods);
+        writeResponse(httpExchange, responseText, HttpResponseCode.METHOD_NOT_ALLOWED.getCode());
+    }
+
+    protected void sendUnsupportedMediaType(HttpExchange httpExchange, String responseText) throws IOException {
+        httpExchange.getResponseHeaders().add("Content-Type", CONTENT_TYPE_JSON);
+        writeResponse(httpExchange, responseText, HttpResponseCode.UNSUPPORTED_MEDIA_TYPE.getCode());
+    }
+
     protected void sendError(HttpExchange httpExchange, String responseText) throws IOException {
-        httpExchange.getResponseHeaders().add("Content-Type", "application/problem+json;charset=utf-8");
+        httpExchange.getResponseHeaders().add("Content-Type", CONTENT_TYPE_JSON);
         writeResponse(httpExchange, responseText, HttpResponseCode.INTERNAL_SERVER_ERROR.getCode());
     }
 
