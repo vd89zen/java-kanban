@@ -15,9 +15,6 @@ import java.util.stream.Collectors;
 public class InMemoryTaskManager implements TaskManager {
     private int counterForIdNumber;
     private boolean isRestarted;
-    private Epic epicForWork;
-    private Task taskForWork;
-    private Subtask subtaskForWork;
     protected final HashSet<Integer> allIdInWork;
     protected final HashMap<Integer, Task> tasks;
     protected final HashMap<Integer, Epic> epics;
@@ -141,7 +138,7 @@ public class InMemoryTaskManager implements TaskManager {
             return ResultOfOperation.ERROR_INTERSECT_TIME;
         }
 
-        taskForWork = new Task(task);
+        Task taskForWork = new Task(task);
 
         if (taskForWork.getIdNumber() == 0) {
             if (generateIdNumber() == ResultOfOperation.SUCCESS) {
@@ -155,7 +152,6 @@ public class InMemoryTaskManager implements TaskManager {
         tasks.put(taskForWork.getIdNumber(), taskForWork);
         allIdInWork.add(taskForWork.getIdNumber());
         addToPriorityList(taskForWork);
-        taskForWork = null;
         return ResultOfOperation.SUCCESS;
     }
 
@@ -210,10 +206,9 @@ public class InMemoryTaskManager implements TaskManager {
         }
 
         prioritizedTasks.remove(tasks.get(task.getIdNumber()));
-        taskForWork = new Task(task);
+        Task taskForWork = new Task(task);
         tasks.put(taskForWork.getIdNumber(), taskForWork);
         addToPriorityList(taskForWork);
-        taskForWork = null;
         return ResultOfOperation.SUCCESS;
     }
 
@@ -246,6 +241,7 @@ public class InMemoryTaskManager implements TaskManager {
             return ResultOfOperation.ERROR_SUBTASKS_NOT_EMPTY;
         }
 
+        Epic epicForWork;
         if (epic.getIdNumber() == 0) {
             if (epic.getDurationInMinutes() != 0 || epic.getStartDateTime().isPresent()
                     || epic.getEndDateTime().isPresent()) {
@@ -264,7 +260,6 @@ public class InMemoryTaskManager implements TaskManager {
 
         epics.put(epicForWork.getIdNumber(), epicForWork);
         allIdInWork.add(epicForWork.getIdNumber());
-        epicForWork = null;
         return ResultOfOperation.SUCCESS;
     }
 
@@ -281,32 +276,23 @@ public class InMemoryTaskManager implements TaskManager {
 
     @Override
     public ArrayList<Subtask> getAllSubtasksFromEpic(int epicIdNumber) throws NotFoundException {
-        if (epicIdNumber <= 0 || epics.isEmpty()) {
+        if (epicIdNumber <= 0 || epics.isEmpty() || epics.containsKey(epicIdNumber) == false) {
             throw new NotFoundException(String.format("Epic (id: %d) for 'get subtasks' not found", epicIdNumber));
         }
 
-        if (subtasks.isEmpty()) {
+        Optional<ArrayList<Integer>> subtaskIdsOptional = epics.get(epicIdNumber).getSubtasksIdNumber();
+
+        if (subtaskIdsOptional.isEmpty()) {
             throw new NotFoundException("List is empty");
         }
 
-        return subtasks.values().stream()
-                .filter(subtask -> subtask.getParentEpicIdNumber() == epicIdNumber)
+        return subtaskIdsOptional.get().stream()
+                .map(subtasks::get)
+                .filter(Objects::nonNull)
                 .map(Subtask::new)
-                .collect(Collectors.toCollection(ArrayList::new)
-                );
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
-    /*
-     * Единственные два поля эпика которые можно валидно обновить вне менеджера, это имя и описание.
-     * Расчётные поля (по сути все остальные, кроме айди и списка сабтасков) в соответствующих ситуациях автоматически
-     * обновляются у экземпляра эпика, находящегося внутри менеджера. Всё что касается сабтасков эпика автоматически
-     * обновляется через менеджера. То есть обновление эпика путём полной замены эпика внутри менеджера эпиком снаружи,
-     * кроме возможности случайных(умышленных) багов (и множества проверок для их избежания) ничего не даёт.
-     * Исходя из текущей сути эпика, он всего лишь вывеска, с описанием, для группы сабтасков, и полностью расчитывается
-     * на их основе. После создания эпика, мы работаем дальше с сабтасками, смысл отдельного обновления эпика
-     * фактически теряется (только если понадобится изменить имя или описание эпика).
-     * Поэтому вместо метода updateEpic(Epic epic), введены два метода для обнобления имени и описания эпика.
-     */
     @Override
     public ResultOfOperation updateEpicName(int epicIdNumber, String newEpicName) {
         if (epicIdNumber < 0) {
@@ -405,7 +391,7 @@ public class InMemoryTaskManager implements TaskManager {
             return ResultOfOperation.ERROR_INTERSECT_TIME;
         }
 
-        subtaskForWork = new Subtask(subtask);
+        Subtask subtaskForWork = new Subtask(subtask);
 
         if (subtaskForWork.getIdNumber() == 0) {
             if (generateIdNumber() == ResultOfOperation.SUCCESS) {
@@ -416,14 +402,12 @@ public class InMemoryTaskManager implements TaskManager {
             }
         }
 
-        epicForWork = epics.get(subtaskForWork.getParentEpicIdNumber());
+        Epic epicForWork = epics.get(subtaskForWork.getParentEpicIdNumber());
         ResultOfOperation resultOfOperation = epicForWork.addSubtask(subtaskForWork);
         if (resultOfOperation == ResultOfOperation.SUCCESS) {
             subtasks.put(subtaskForWork.getIdNumber(), subtaskForWork);
             allIdInWork.add(subtaskForWork.getIdNumber());
             addToPriorityList(subtaskForWork);
-            subtaskForWork = null;
-            epicForWork = null;
             return ResultOfOperation.SUCCESS;
         } else {
             return resultOfOperation;
@@ -499,7 +483,7 @@ public class InMemoryTaskManager implements TaskManager {
 
         int subtaskIdNumber = subtask.getIdNumber();
         int subtaskParentEpicIdNumber = subtask.getParentEpicIdNumber();
-        subtaskForWork = new Subtask(subtask);
+        Subtask subtaskForWork = new Subtask(subtask);
 
         if (subtaskIdNumber <= 0 || epics.isEmpty() || subtasks.isEmpty() || subtasks.containsKey(subtaskIdNumber) == false) {
             throw new NotFoundException(String.format("Subtask (id: %d) for 'update' not found", subtask.getIdNumber()));
