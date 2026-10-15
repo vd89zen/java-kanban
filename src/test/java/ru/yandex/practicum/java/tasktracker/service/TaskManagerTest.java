@@ -1,6 +1,5 @@
-package ru.yandex.practicum.java.tasktracker.manage;
+package ru.yandex.practicum.java.tasktracker.service;
 
-import ru.yandex.practicum.java.tasktracker.exceptions.NotFoundException;
 import ru.yandex.practicum.java.tasktracker.task.*;
 import ru.yandex.practicum.java.tasktracker.utils.*;
 import java.time.LocalDateTime;
@@ -8,10 +7,10 @@ import java.util.ArrayList;
 import org.junit.jupiter.api.*;
 import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
 import ru.yandex.practicum.java.tasktracker.utils.enums.StatusProgress;
-import ru.yandex.practicum.java.tasktracker.service.interfaces.TaskManager;
+
 import static org.junit.jupiter.api.Assertions.*;
 
-abstract class TaskManagerTest<T extends TaskManager> {
+class TaskManagerTest {
     protected TaskManager taskManager;
     protected ResultOfOperation actualResult;
     protected ResultOfOperation expectedResult;
@@ -44,6 +43,12 @@ abstract class TaskManagerTest<T extends TaskManager> {
     protected Epic baseEpicWithoutSubtask;
     protected final String BASE_EPIC_WITHOUT_SUBTASK_NAME = "baseEpicWithoutSubtask";
     protected final Integer BASE_EPIC_WITHOUT_SUBTASK_ID = 15;
+
+    @BeforeEach
+    public void prepareForTest() {
+        taskManager = new TaskManager();
+        fillData();
+    }
 
     public void fillData() {
         baseTask1 = new Task(BASE_TASK_1_ID, BASE_TASK_1_NAME, DESCRIPTION, StatusProgress.NEW);

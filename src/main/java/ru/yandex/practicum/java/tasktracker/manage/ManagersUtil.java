@@ -1,11 +1,9 @@
 package ru.yandex.practicum.java.tasktracker.manage;
 
 import ru.yandex.practicum.java.tasktracker.config.AppConfig;
-import ru.yandex.practicum.java.tasktracker.service.FileBackedTaskManager;
-import ru.yandex.practicum.java.tasktracker.service.InMemoryHistoryManager;
-import ru.yandex.practicum.java.tasktracker.service.InMemoryTaskManager;
-import ru.yandex.practicum.java.tasktracker.service.interfaces.HistoryManager;
-import ru.yandex.practicum.java.tasktracker.service.interfaces.TaskManager;
+import ru.yandex.practicum.java.tasktracker.service.TaskViewHistory;
+import ru.yandex.practicum.java.tasktracker.service.TaskManager;
+import ru.yandex.practicum.java.tasktracker.storage.CsvStorage;
 
 import java.io.File;
 
@@ -15,19 +13,18 @@ public final class ManagersUtil {
     }
 
     public static TaskManager getDefault() {
-        return new InMemoryTaskManager();
+        return new TaskManager();
     }
 
-    public static HistoryManager getDefaultHistory() {
-        return new InMemoryHistoryManager();
+    public static TaskViewHistory getDefaultHistory() {
+        return new TaskViewHistory();
     }
 
-    public static FileBackedTaskManager getFileBackedTaskManager() {
-        String dataFilePath = AppConfig.getDataFilePath();
-        return FileBackedTaskManager.loadFromFileUsingMethods(new File(dataFilePath));
+    public static TaskManager getFileBacked() {
+        return new TaskManager(new CsvStorage(new File(AppConfig.getDataFilePath())));
     }
 
-    public static FileBackedTaskManager getFileBackedTaskManager(File file) {
-        return FileBackedTaskManager.loadFromFileUsingMethods(file);
+    public static TaskManager getFileBacked(File file) {
+        return new TaskManager(new CsvStorage(file));
     }
 }

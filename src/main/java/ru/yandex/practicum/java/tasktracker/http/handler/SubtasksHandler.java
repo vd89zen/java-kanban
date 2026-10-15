@@ -8,7 +8,7 @@ import ru.yandex.practicum.java.tasktracker.exceptions.NotFoundException;
 import ru.yandex.practicum.java.tasktracker.task.Subtask;
 import ru.yandex.practicum.java.tasktracker.utils.TextForGson;
 import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
-import ru.yandex.practicum.java.tasktracker.service.interfaces.TaskManager;
+import ru.yandex.practicum.java.tasktracker.service.TaskManager;
 import java.io.IOException;
 import java.util.List;
 

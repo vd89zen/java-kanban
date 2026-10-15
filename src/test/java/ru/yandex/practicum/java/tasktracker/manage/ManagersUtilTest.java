@@ -2,8 +2,8 @@ package ru.yandex.practicum.java.tasktracker.manage;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import ru.yandex.practicum.java.tasktracker.service.InMemoryHistoryManager;
-import ru.yandex.practicum.java.tasktracker.service.InMemoryTaskManager;
+import ru.yandex.practicum.java.tasktracker.service.TaskViewHistory;
+import ru.yandex.practicum.java.tasktracker.service.TaskManager;
 import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("Тесты для ManagersUtil (Менеджер менеджеров).")
@@ -15,7 +15,7 @@ class ManagersUtilTest {
         //Given
         boolean isInMemoryTaskManager = false;
         //When
-        isInMemoryTaskManager = ManagersUtil.getDefault() instanceof InMemoryTaskManager;
+        isInMemoryTaskManager = ManagersUtil.getDefault() instanceof TaskManager;
         //Then
         assertTrue(isInMemoryTaskManager);
     }
@@ -26,7 +26,7 @@ class ManagersUtilTest {
         //Given
         boolean isInMemoryHistoryManager = false;
         //When
-        isInMemoryHistoryManager = ManagersUtil.getDefaultHistory() instanceof InMemoryHistoryManager;
+        isInMemoryHistoryManager = ManagersUtil.getDefaultHistory() instanceof TaskViewHistory;
         //Then
         assertTrue(isInMemoryHistoryManager);
     }

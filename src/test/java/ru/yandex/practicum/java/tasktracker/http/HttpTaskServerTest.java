@@ -2,13 +2,12 @@ package ru.yandex.practicum.java.tasktracker.http;
 
 import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.*;
-import ru.yandex.practicum.java.tasktracker.service.InMemoryTaskManager;
+import ru.yandex.practicum.java.tasktracker.service.TaskManager;
 import ru.yandex.practicum.java.tasktracker.task.*;
 import ru.yandex.practicum.java.tasktracker.utils.AbstractTask;
 import ru.yandex.practicum.java.tasktracker.utils.TextForGson;
 import ru.yandex.practicum.java.tasktracker.utils.enums.StatusProgress;
 import ru.yandex.practicum.java.tasktracker.utils.gson.*;
-import ru.yandex.practicum.java.tasktracker.service.interfaces.TaskManager;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -29,7 +28,7 @@ class HttpTaskServerTest {
     Gson gson;
 
     public HttpTaskServerTest() throws IOException {
-        taskManager = new InMemoryTaskManager();
+        taskManager = new TaskManager();
         httpTaskServer = new HttpTaskServer(taskManager);
         gson = new GsonBuilder()
                 .registerTypeAdapter(LocalDateTime.class, new LocalDateTimeTypeAdapter())
