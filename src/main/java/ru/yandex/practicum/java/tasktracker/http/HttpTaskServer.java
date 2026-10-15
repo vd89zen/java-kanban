@@ -7,7 +7,7 @@ import com.sun.net.httpserver.HttpServer;
 import ru.yandex.practicum.java.tasktracker.config.AppConfig;
 import ru.yandex.practicum.java.tasktracker.http.handler.*;
 import ru.yandex.practicum.java.tasktracker.manage.ManagersUtil;
-import ru.yandex.practicum.java.tasktracker.service.interfaces.TaskManager;
+import ru.yandex.practicum.java.tasktracker.service.TaskManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

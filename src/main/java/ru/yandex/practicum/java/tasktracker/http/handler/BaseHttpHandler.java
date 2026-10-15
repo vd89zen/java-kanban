@@ -8,7 +8,7 @@ import ru.yandex.practicum.java.tasktracker.utils.enums.HttpResponseCode;
 import ru.yandex.practicum.java.tasktracker.utils.gson.AbstractTaskDeserializer;
 import ru.yandex.practicum.java.tasktracker.utils.gson.DurationTypeAdapter;
 import ru.yandex.practicum.java.tasktracker.utils.gson.LocalDateTimeTypeAdapter;
-import ru.yandex.practicum.java.tasktracker.service.interfaces.TaskManager;
+import ru.yandex.practicum.java.tasktracker.service.TaskManager;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
@@ -55,11 +55,6 @@ public class BaseHttpHandler {
     protected void sendBadRequest(HttpExchange httpExchange, String responseText) throws IOException {
         httpExchange.getResponseHeaders().add("Content-Type", CONTENT_TYPE_JSON);
         writeResponse(httpExchange, responseText, HttpResponseCode.BAD_REQUEST.getCode());
-    }
-
-    protected void sendHasInteractions(HttpExchange httpExchange, String responseText) throws IOException {
-        httpExchange.getResponseHeaders().add("Content-Type", CONTENT_TYPE_JSON);
-        writeResponse(httpExchange, responseText, HttpResponseCode.NOT_ACCEPTABLE.getCode());
     }
 
     protected void sendConflict(HttpExchange httpExchange, String responseText) throws IOException {

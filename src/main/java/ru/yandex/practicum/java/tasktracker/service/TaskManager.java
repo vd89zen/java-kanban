@@ -1,18 +1,22 @@
 package ru.yandex.practicum.java.tasktracker.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import ru.yandex.practicum.java.tasktracker.exceptions.NotFoundException;
 import ru.yandex.practicum.java.tasktracker.manage.ManagersUtil;
+import ru.yandex.practicum.java.tasktracker.storage.LoadedState;
+import ru.yandex.practicum.java.tasktracker.storage.NoopStorage;
+import ru.yandex.practicum.java.tasktracker.storage.TaskStorage;
 import ru.yandex.practicum.java.tasktracker.task.*;
 import ru.yandex.practicum.java.tasktracker.utils.*;
 import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
-import ru.yandex.practicum.java.tasktracker.service.interfaces.HistoryManager;
-import ru.yandex.practicum.java.tasktracker.service.interfaces.TaskManager;
 
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class InMemoryTaskManager implements TaskManager {
+public class TaskManager {
+    private static final Logger log = LoggerFactory.getLogger(TaskManager.class);
     private int counterForIdNumber;
     private boolean isRestarted;
     protected final HashSet<Integer> allIdInWork;
@@ -20,9 +24,15 @@ public class InMemoryTaskManager implements TaskManager {
     protected final HashMap<Integer, Epic> epics;
     protected final HashMap<Integer, Subtask> subtasks;
     protected final TreeSet<AbstractTask> prioritizedTasks;
-    private final HistoryManager historyManager;
+    private final TaskViewHistory historyManager;
+    private final TaskStorage storage;
 
-    public InMemoryTaskManager() {
+    public TaskManager() {
+        this(new NoopStorage());
+    }
+
+    public TaskManager(TaskStorage storage) {
+        this.storage = Objects.requireNonNull(storage, "'storage' can't be null");
         tasks = new HashMap<>();
         epics = new HashMap<>();
         subtasks = new HashMap<>();
@@ -43,6 +53,54 @@ public class InMemoryTaskManager implements TaskManager {
 
             return startCompare;
         });
+        initFromStorage();
+    }
+
+    private void initFromStorage() {
+        LoadedState state = storage.load();
+
+        for (Task task : state.tasks()) {
+            Task copy = new Task(task);
+            tasks.put(copy.getIdNumber(), copy);
+            allIdInWork.add(copy.getIdNumber());
+            counterForIdNumber = Math.max(counterForIdNumber, copy.getIdNumber() + 1);
+        }
+        for (Epic epic : state.epics()) {
+            Epic copy = new Epic(epic);
+            epics.put(copy.getIdNumber(), copy);
+            allIdInWork.add(copy.getIdNumber());
+            counterForIdNumber = Math.max(counterForIdNumber, copy.getIdNumber() + 1);
+        }
+        for (Subtask subtask : state.subtasks()) {
+            Subtask copy = new Subtask(subtask);
+            subtasks.put(copy.getIdNumber(), copy);
+            allIdInWork.add(copy.getIdNumber());
+            counterForIdNumber = Math.max(counterForIdNumber, copy.getIdNumber() + 1);
+        }
+
+        for (Subtask subtask : subtasks.values()) {
+            Epic parent = epics.get(subtask.getParentEpicIdNumber());
+            if (parent != null) {
+                parent.addSubtask(subtask);
+            }
+        }
+
+        for (Task task : tasks.values()) {
+            if (task.getStartDateTime().isPresent()) {
+                prioritizedTasks.add(new Task(task));
+            }
+        }
+        for (Subtask subtask : subtasks.values()) {
+            if (subtask.getStartDateTime().isPresent()) {
+                prioritizedTasks.add(new Subtask(subtask));
+            }
+        }
+
+        verifyIntegrity();
+    }
+
+    private void persist() {
+        storage.save(tasks.values(), epics.values(), subtasks.values());
     }
 
     private ResultOfOperation generateIdNumber() {
@@ -84,6 +142,27 @@ public class InMemoryTaskManager implements TaskManager {
         }
     }
 
+    private void verifyIntegrity() {
+        List<Subtask> orphanSubtasks = subtasks.values().stream()
+                .filter(subtask -> !epics.containsKey(subtask.getParentEpicIdNumber()))
+                .toList();
+
+        if (orphanSubtasks.isEmpty()) {
+            return;
+        }
+
+        log.warn("Found {} orphan subtask(s) referencing non-existent epic. Removing.", orphanSubtasks.size());
+        for (Subtask subtask : orphanSubtasks) {
+            log.warn("  Subtask id={} '{}' references epic id={}",
+                    subtask.getIdNumber(),
+                    subtask.getName().orElse("null"),
+                    subtask.getParentEpicIdNumber());
+            subtasks.remove(subtask.getIdNumber());
+            allIdInWork.remove(subtask.getIdNumber());
+            prioritizedTasks.removeIf(task -> task.getIdNumber() == subtask.getIdNumber());
+        }
+    }
+
     public boolean isTimeIntersectBoth(AbstractTask taskOne, AbstractTask taskTwo) {
         if (taskOne == null || taskTwo == null || taskOne.getStartDateTime().isEmpty()
                 || taskTwo.getStartDateTime().isEmpty()) {
@@ -94,7 +173,6 @@ public class InMemoryTaskManager implements TaskManager {
                 || taskOne.getStartDateTime().get().isAfter(taskTwo.getEndDateTime().get()));
     }
 
-    @Override
     public boolean isTimeIntersectWithOthers(AbstractTask task) {
         if (task == null || task.getStartDateTime().isEmpty()) {
             return false;
@@ -107,23 +185,19 @@ public class InMemoryTaskManager implements TaskManager {
                         : false);
     }
 
-    @Override
     public ArrayList<AbstractTask> getPrioritizedTasks() {
         return new ArrayList<>(prioritizedTasks);
     }
 
-    @Override
     public int getTotalOfIdInWork() {
         return allIdInWork.size();
     }
 
-    @Override
     public ArrayList<AbstractTask> getHistory() {
         return historyManager.getHistory();
     }
 
     //TASK
-    @Override
     public ResultOfOperation addTask(Task task) {
         if (task == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
@@ -152,17 +226,16 @@ public class InMemoryTaskManager implements TaskManager {
         tasks.put(taskForWork.getIdNumber(), taskForWork);
         allIdInWork.add(taskForWork.getIdNumber());
         addToPriorityList(taskForWork);
+        persist();
         return ResultOfOperation.SUCCESS;
     }
 
-    @Override
     public ArrayList<Task> getAllTasks() {
         return tasks.values().stream()
                 .map(Task::new)
                 .collect(Collectors.toCollection(ArrayList::new));
     }
 
-    @Override
     public ResultOfOperation removeAllTasks() {
         if (tasks.isEmpty()) {
             return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
@@ -175,10 +248,10 @@ public class InMemoryTaskManager implements TaskManager {
 
         allIdInWork.removeAll(tasks.keySet());
         tasks.clear();
+        persist();
         return ResultOfOperation.SUCCESS;
     }
 
-    @Override
     public Task getTaskByIdNumber(int taskIdNumber) throws NotFoundException {
         if (taskIdNumber <= 0 || tasks.isEmpty() || tasks.containsKey(taskIdNumber) == false) {
             throw new NotFoundException(String.format("Task (id: %d) for 'get' not found", taskIdNumber));
@@ -187,7 +260,6 @@ public class InMemoryTaskManager implements TaskManager {
         return new Task(tasks.get(taskIdNumber));
     }
 
-    @Override
     public ResultOfOperation updateTask(Task task) throws NotFoundException {
         if (task == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
@@ -204,10 +276,10 @@ public class InMemoryTaskManager implements TaskManager {
         Task taskForWork = new Task(task);
         tasks.put(taskForWork.getIdNumber(), taskForWork);
         addToPriorityList(taskForWork);
+        persist();
         return ResultOfOperation.SUCCESS;
     }
 
-    @Override
     public ResultOfOperation removeTaskByIdNumber(int taskIdNumber) throws NotFoundException {
         if (taskIdNumber <= 0 || tasks.isEmpty() || tasks.containsKey(taskIdNumber) == false) {
             throw new NotFoundException(String.format("Task (id: %d) for 'remove' not found", taskIdNumber));
@@ -217,11 +289,11 @@ public class InMemoryTaskManager implements TaskManager {
         tasks.remove(taskIdNumber);
         historyManager.removeRecord(taskIdNumber);
         allIdInWork.remove(taskIdNumber);
+        persist();
         return ResultOfOperation.SUCCESS;
     }
 
     //EPIC
-    @Override
     public ResultOfOperation addEpic(Epic epic) {
         if (epic == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
@@ -255,17 +327,16 @@ public class InMemoryTaskManager implements TaskManager {
 
         epics.put(epicForWork.getIdNumber(), epicForWork);
         allIdInWork.add(epicForWork.getIdNumber());
+        persist();
         return ResultOfOperation.SUCCESS;
     }
 
-    @Override
     public ArrayList<Epic> getAllEpics() {
         return epics.values().stream()
                 .map(Epic::new)
                 .collect(Collectors.toCollection(ArrayList::new));
     }
 
-    @Override
     public ArrayList<Subtask> getAllSubtasksFromEpic(int epicIdNumber) throws NotFoundException {
         if (epicIdNumber <= 0 || epics.isEmpty() || epics.containsKey(epicIdNumber) == false) {
             throw new NotFoundException(String.format("Epic (id: %d) for 'get subtasks' not found", epicIdNumber));
@@ -280,7 +351,6 @@ public class InMemoryTaskManager implements TaskManager {
                 .collect(Collectors.toCollection(ArrayList::new));
     }
 
-    @Override
     public ResultOfOperation updateEpicName(int epicIdNumber, String newEpicName) {
         if (epicIdNumber < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
@@ -291,10 +361,10 @@ public class InMemoryTaskManager implements TaskManager {
         }
 
         epics.get(epicIdNumber).setName(newEpicName);
+        persist();
         return ResultOfOperation.SUCCESS;
     }
 
-    @Override
     public ResultOfOperation updateEpicDescription(int epicIdNumber, String newEpicDescription) {
         if (epicIdNumber < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
@@ -305,10 +375,10 @@ public class InMemoryTaskManager implements TaskManager {
         }
 
         epics.get(epicIdNumber).setDescription(newEpicDescription);
+        persist();
         return ResultOfOperation.SUCCESS;
     }
 
-    @Override
     public ResultOfOperation removeAllEpics() {
         if (epics.isEmpty()) {
             return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
@@ -326,10 +396,10 @@ public class InMemoryTaskManager implements TaskManager {
         epics.keySet().forEach(id -> historyManager.removeRecord(id));
         allIdInWork.removeAll(epics.keySet());
         epics.clear();
+        persist();
         return ResultOfOperation.SUCCESS;
     }
 
-    @Override
     public Epic getEpicByIdNumber(int epicIdNumber) throws NotFoundException {
         if (epicIdNumber <= 0 || epics.isEmpty() || epics.containsKey(epicIdNumber) == false) {
             throw new NotFoundException(String.format("Epic (id: %d) for 'get' not found", epicIdNumber));
@@ -338,7 +408,6 @@ public class InMemoryTaskManager implements TaskManager {
         return new Epic(epics.get(epicIdNumber));
     }
 
-    @Override
     public ResultOfOperation removeEpicByIdNumber(int epicIdNumber) {
         if (epicIdNumber <= 0 || epics.isEmpty() || epics.containsKey(epicIdNumber) == false) {
             throw new NotFoundException(String.format("Epic (id: %d) for 'remove' not found", epicIdNumber));
@@ -357,11 +426,11 @@ public class InMemoryTaskManager implements TaskManager {
         epics.remove(epicIdNumber);
         allIdInWork.remove(epicIdNumber);
         historyManager.removeRecord(epicIdNumber);
+        persist();
         return ResultOfOperation.SUCCESS;
     }
 
     //SUBTASK
-    @Override
     public ResultOfOperation addSubtask(Subtask subtask) {
         if (subtask == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
@@ -395,20 +464,19 @@ public class InMemoryTaskManager implements TaskManager {
             subtasks.put(subtaskForWork.getIdNumber(), subtaskForWork);
             allIdInWork.add(subtaskForWork.getIdNumber());
             addToPriorityList(subtaskForWork);
+            persist();
             return ResultOfOperation.SUCCESS;
         } else {
             return resultOfOperation;
         }
     }
 
-    @Override
     public ArrayList<Subtask> getAllSubtasks() {
         return subtasks.values().stream()
                 .map(Subtask::new)
                 .collect(Collectors.toCollection(ArrayList::new));
     }
 
-    @Override
     public ResultOfOperation removeAllSubtasks() {
         if (epics.isEmpty() || subtasks.isEmpty()) {
             return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
@@ -421,10 +489,10 @@ public class InMemoryTaskManager implements TaskManager {
         });
         allIdInWork.removeAll(subtasks.keySet());
         subtasks.clear();
+        persist();
         return ResultOfOperation.SUCCESS;
     }
 
-    @Override
     public Subtask getSubtaskByIdNumber(int subtaskIdNumber) throws NotFoundException {
         if (subtaskIdNumber <= 0 || epics.isEmpty() || subtasks.isEmpty()
                 || subtasks.containsKey(subtaskIdNumber) == false) {
@@ -435,7 +503,7 @@ public class InMemoryTaskManager implements TaskManager {
         return new Subtask(subtasks.get(subtaskIdNumber));
     }
 
-    @Override
+
     public ResultOfOperation removeSubtaskByIdNumber(int subtaskIdNumber) throws NotFoundException {
         if (subtaskIdNumber <= 0 || epics.isEmpty() || subtasks.isEmpty() || subtasks.containsKey(subtaskIdNumber) == false) {
             throw new NotFoundException(String.format("Subtask (id: %d) for 'remove' not found", subtaskIdNumber));
@@ -447,14 +515,17 @@ public class InMemoryTaskManager implements TaskManager {
         historyManager.removeRecord(subtaskIdNumber);
         allIdInWork.remove(subtaskIdNumber);
         if (epics.containsKey(parentEpicIdNumber)) {
-            return epics.get(parentEpicIdNumber).removeSubtask(subtaskIdNumber);
+            ResultOfOperation result = epics.get(parentEpicIdNumber).removeSubtask(subtaskIdNumber);
+            if (result == ResultOfOperation.SUCCESS) {
+                persist();
+            }
+            return result;
         } else {
             throw new NotFoundException(String.format("Subtask (id: %d) for 'remove' not found: %s",
                     subtaskIdNumber, ResultOfOperation.ERROR_MISMATCH_PARENT_ID.name()));
         }
     }
 
-    @Override
     public ResultOfOperation updateSubtask(Subtask subtask) throws NotFoundException {
         if (subtask == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
@@ -479,6 +550,10 @@ public class InMemoryTaskManager implements TaskManager {
         prioritizedTasks.remove(subtasks.get(subtaskIdNumber));
         subtasks.put(subtaskIdNumber, subtaskForWork);
         addToPriorityList(subtaskForWork);
-        return epics.get(subtaskParentEpicIdNumber).updateSubtask(subtask);
+        ResultOfOperation result = epics.get(subtaskParentEpicIdNumber).updateSubtask(subtask);
+        if (result == ResultOfOperation.SUCCESS) {
+            persist();
+        }
+        return result;
     }
 }
