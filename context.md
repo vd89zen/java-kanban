@@ -6,7 +6,7 @@ Backend-сервис для управления задачами по мето�
 учебного Яндекс Практикума, в процессе доработки.
 
 Репозиторий: https://github.com/vd89zen/java-kanban
-Активная ветка: `develop-stage-4-storage` (этапы 0-1-2-3-4 закрыты, этап 5 следующий).
+Активная ветка: `develop-stage-5-concurrency` (этапы 0-1-2-3-4-5 закрыты, этап 6 следующий).
 
 **Стек:** Java 17+, `com.sun.net.httpserver.HttpServer`, Gson, Maven, JUnit 5,
 SLF4J + Logback.
@@ -46,7 +46,7 @@ maven-shade 3.5.3 (Services + Manifest transformers), exec-maven-plugin 3.2.0.
 
 ```
 TaskTrackerApplication
-  └── HttpTaskServer (com.sun.net.httpserver)
+  └── HttpTaskServer (com.sun.net.httpserver)  ← ExecutorService (fixed pool, 8 потоков)
         ├── /tasks        → TasksHandler
         ├── /subtasks     → SubtasksHandler
         ├── /epics        → EpicsHandler
@@ -54,20 +54,19 @@ TaskTrackerApplication
         └── /prioritized  → PrioritizedHandler
                 │
                 ▼
-        TaskManager (класс)
-        ├── TaskViewHistory (LinkedHashMapCustom)
+        TaskManager (класс, потокобезопасный)
+        ├── TaskViewHistory (потокобезопасный через synchronized)
         └── TaskStorage (интерфейс)
-              ├── NoopStorage  (no-op, для чистой in-memory)
+              ├── NoopStorage  (no-op)
               └── CsvStorage   (CSV-персистенция)
 ```
 
 **Ключевые решения:**
-- Интерфейсы `TaskManager` и `HistoryManager` **удалены** — реализация одна,
-  полиморфизм переехал на уровень `TaskStorage`.
-- `FileBackedTaskManager` **удалён** — заменён на композицию
-  `TaskManager(new CsvStorage(file))`.
-- Менеджер держит состояние в `HashMap`, после каждой успешной мутации вызывает
-  `storage.save(...)`. При создании — `storage.load()`, `initFromStorage()`.
+- Интерфейсы `TaskManager` и `HistoryManager` удалены — реализация одна,
+  полиморфизм переехал на `TaskStorage`.
+- `FileBackedTaskManager` удалён — заменён композицией `TaskManager(new CsvStorage(file))`.
+- Менеджер держит состояние в concurrent-коллекциях, все мутации — под единым локом.
+- Генерация id — монотонный счётчик `nextId`, без переиспользования удалённых id.
 
 Пакеты:
 
@@ -116,14 +115,16 @@ TaskTrackerApplication
 │       ├── http/HttpTaskServerTest.java
 │       ├── manage/ManagersUtilTest.java
 │       ├── manage/LinkedHashMapCustomTest.java
-│       ├── service/TaskManagerTest.java
-│       ├── service/TaskViewHistoryTest.java
+│       ├── service/
+│       │   ├── TaskManagerTest.java
+│       │   ├── TaskViewHistoryTest.java
+│       │   └── TaskManagerConcurrencyTest.java
 │       └── task/...  (EpicTest, SubtaskTest, TaskTest)
 ```
 
 ## Ключевые сигнатуры
 
-### `service.TaskManager` (класс; бывший `InMemoryTaskManager`)
+### `service.TaskManager`
 
 Конструкторы:
 ```
@@ -131,52 +132,41 @@ TaskManager()                      // внутри new NoopStorage()
 TaskManager(TaskStorage storage)   // storage != null
 ```
 
-Приватные методы: `generateIdNumber()`, `addToPriorityList(AbstractTask)`,
-`initFromStorage()`, `persist()`, `verifyIntegrity()`.
+Приватные поля:
+- `int nextId` — монотонный счётчик id.
+- `final Set<Integer> allIdInWork` — `ConcurrentHashMap.newKeySet()`.
+- `final Map<Integer, Task> tasks`, `epics`, `subtasks` — `ConcurrentHashMap`.
+- `final NavigableSet<AbstractTask> prioritizedTasks` — `ConcurrentSkipListSet`.
+- `final TaskViewHistory historyManager`.
+- `final TaskStorage storage`.
+- `final Object lock` — единый лок для мутаций.
 
-Публичные методы (реализация интерфейса, который удалён — но сигнатуры те же):
+Приватные методы: `generateIdNumber()` (возвращает `int` через `nextId`),
+`addToPriorityList(AbstractTask)`, `initFromStorage()`, `persist()`,
+`verifyIntegrity()`.
 
-```
-ArrayList<AbstractTask> getPrioritizedTasks()
-boolean isTimeIntersectBoth(AbstractTask, AbstractTask)         // пока public, станет private в этапе 7
-boolean isTimeIntersectWithOthers(AbstractTask)                 // пока public, станет private в этапе 7
-ArrayList<AbstractTask> getHistory()
-int getTotalOfIdInWork()
-ResultOfOperation addTask(Task)
-Task getTaskByIdNumber(int)                    // throws NotFoundException
-ResultOfOperation removeTaskByIdNumber(int)    // throws NotFoundException
-ResultOfOperation updateTask(Task)             // throws NotFoundException
-ArrayList<Task> getAllTasks()                  // 200 + [] на пустом
-ResultOfOperation removeAllTasks()
-ResultOfOperation addEpic(Epic)
-Epic getEpicByIdNumber(int)                    // throws NotFoundException
-ResultOfOperation removeEpicByIdNumber(int)
-ResultOfOperation updateEpicName(int, String)
-ResultOfOperation updateEpicDescription(int, String)
-ArrayList<Subtask> getAllSubtasksFromEpic(int) // throws NotFoundException если эпика нет; [] если подзадач нет
-ArrayList<Epic> getAllEpics()                  // 200 + []
-ResultOfOperation removeAllEpics()
-ResultOfOperation addSubtask(Subtask)
-Subtask getSubtaskByIdNumber(int)              // throws NotFoundException
-ResultOfOperation removeSubtaskByIdNumber(int) // throws NotFoundException
-ResultOfOperation updateSubtask(Subtask)       // throws NotFoundException
-ArrayList<Subtask> getAllSubtasks()            // 200 + []
-ResultOfOperation removeAllSubtasks()
-```
+Публичные методы: те же сигнатуры, что в этапе 4 (см. git history).
 
-Поля (protected): `allIdInWork`, `tasks`, `epics`, `subtasks`, `prioritizedTasks`.
-Плюс `private final TaskStorage storage`, `private final TaskViewHistory historyManager`.
+**Потокобезопасность:**
+- Все мутации — под `synchronized (lock)`.
+- Проверки, зависящие от общего состояния (уникальность id, пересечение
+  интервалов, наличие родителя), внутри лока.
+- Генерация id, изменения коллекций — внутри лока.
+- `persist()` — вне лока (I/O не держит блокировку).
+- Читающие методы — без лока (concurrent-коллекции).
+- Порядок захвата: сначала `lock`, затем монитор `TaskViewHistory`. Обратного
+  пути нет — deadlock исключён.
 
-### `service.TaskViewHistory` (класс; бывший `InMemoryHistoryManager`)
+**Javadoc на классе** описывает атомарность, персистенцию и порядок локов.
+
+### `service.TaskViewHistory`
 
 ```
 TaskViewHistory()
-ResultOfOperation addRecord(AbstractTask)
-ResultOfOperation removeRecord(int)
-ArrayList<AbstractTask> getHistory()
+synchronized ResultOfOperation addRecord(AbstractTask)
+synchronized ResultOfOperation removeRecord(int)
+synchronized ArrayList<AbstractTask> getHistory()
 ```
-
-Поле `LinkedHashMapCustom history`.
 
 ### `storage.TaskStorage` (интерфейс)
 
@@ -191,35 +181,25 @@ LoadedState load()
 record LoadedState(Collection<Task> tasks, Collection<Epic> epics, Collection<Subtask> subtasks)
 ```
 
-### `storage.NoopStorage`
+### `storage.NoopStorage` / `storage.CsvStorage`
 
-`save()` — пустой, `load()` — пустой `LoadedState`.
-
-### `storage.CsvStorage`
-
-```
-CsvStorage(File file)
-void save(...)     // сортировка по id, createDirectories если есть родитель
-LoadedState load() // парсит CSV, пропускает битые строки с warn-логом
-```
-
-Заголовок CSV: `id,type,name,description,statusProgress,parentEpic,childSubtasks,durationInMinutes,startDateTime,endDateTime`.
-Плейсхолдеры: `SKIP`, `EMPTY`.
+См. этап 4. `CsvStorage.save` сортирует по id, `load` пропускает битые
+строки с warn-логом.
 
 ### `manage.ManagersUtil`
 
 ```
-static TaskManager getDefault()                     // new TaskManager()
-static TaskViewHistory getDefaultHistory()          // new TaskViewHistory()
-static TaskManager getFileBacked()                  // TaskManager(new CsvStorage(AppConfig.getDataFilePath()))
-static TaskManager getFileBacked(File)              // TaskManager(new CsvStorage(file))
+static TaskManager getDefault()
+static TaskViewHistory getDefaultHistory()
+static TaskManager getFileBacked()
+static TaskManager getFileBacked(File)
 ```
 
 ### `config.AppConfig`
 
 ```
-static int getServerPort()      // env SERVER_PORT / -Dserver.port / 8080
-static String getDataFilePath() // env DATA_FILE / -Ddata.file / "tasks.csv"
+static int getServerPort()
+static String getDataFilePath()
 ```
 
 ### `LinkedHashMapCustom`
@@ -235,187 +215,133 @@ boolean equals(Object)
 int hashCode()
 ```
 
-### `AbstractTask` (абстрактный)
-
-Поля: `idNumber`, `name`, `description`, `statusProgress`, `type`,
-`durationInMinutes` (Duration), `startDateTime` (LocalDateTime).
+### `AbstractTask`
 
 Default-конструктор: `idNumber = -1`, `durationInMinutes = Duration.ZERO`.
 **Gson десериализует через no-arg конструктор + reflection.** При POST без `id`
 получаем `idNumber = -1` — хендлеры нормализуют в `0` в ветке создания.
 
-Публичные методы:
-```
-Optional<String> getName()
-ResultOfOperation setName(String)
-Optional<String> getDescription()
-ResultOfOperation setDescription(String)
-ResultOfOperation setIdNumber(int)
-int getIdNumber()
-StatusProgress getStatusProgress()
-TypesTasks getTypeTask()
-long getDurationInMinutes()
-Optional<LocalDateTime> getStartDateTime()
-Optional<LocalDateTime> getEndDateTime()
-```
+Публичные методы: `getName`, `setName`, `getDescription`, `setDescription`,
+`setIdNumber`, `getIdNumber`, `getStatusProgress`, `getTypeTask`,
+`getDurationInMinutes`, `getStartDateTime`, `getEndDateTime`.
 
 ### `Task` / `Subtask` / `Epic`
 
-Как раньше. `Subtask` — валидация родителя в приватном
-`validateParentEpicId(int)`. `Epic` — вложенный `SubtaskFields` с
-`equals`/`hashCode`.
+Как раньше. `Subtask` — валидация родителя в приватном `validateParentEpicId(int)`.
+`Epic` — вложенный `SubtaskFields` с `equals`/`hashCode`.
 
 ### `HttpTaskServer`
 
 ```
-HttpTaskServer() throws IOException                    // TaskManager()
+HttpTaskServer() throws IOException
 HttpTaskServer(TaskManager) throws IOException
 void start()   // log.info("HTTP server started on port {}", port)
-void stop()    // log.info("HTTP server stopped")
+void stop()    // httpServer.stop(1); executor.shutdownNow() + awaitTermination(1s)
 ```
 
-Порт из `AppConfig.getServerPort()`.
+Поля: `HttpServer`, `TaskManager`, `int port`, `ExecutorService executor` (fixed, 8).
+`THREAD_POOL_SIZE = 8`, `SHUTDOWN_TIMEOUT_SECONDS = 1`.
 
 ### `BaseHttpHandler`
 
-Константа `CONTENT_TYPE_JSON = "application/json;charset=utf-8"`.
-
-```
-BaseHttpHandler(TaskManager)
-protected void sendText(HttpExchange, String)                                       // 200
-protected void sendCreated(HttpExchange, String)                                    // 201
-protected void sendNoContent(HttpExchange)                                          // 204, без тела
-protected void sendNotFound(HttpExchange, String)                                   // 404
-protected void sendBadRequest(HttpExchange, String)                                 // 400
-protected void sendConflict(HttpExchange, String)                                   // 409
-protected void sendMethodNotAllowed(HttpExchange, String, String allowedMethods)    // 405 + Allow
-protected void sendUnsupportedMediaType(HttpExchange, String)                       // 415
-protected void sendError(HttpExchange, String)                                      // 500
-protected void writeResponse(HttpExchange, String, int)
-```
-
-`sendHasInteractions` и `NOT_ACCEPTABLE` удалены в этапе 4.
+Константа `CONTENT_TYPE_JSON`. Хелперы: `sendText` (200), `sendCreated` (201),
+`sendNoContent` (204), `sendNotFound` (404), `sendBadRequest` (400),
+`sendConflict` (409), `sendMethodNotAllowed` (405 + `Allow`),
+`sendUnsupportedMediaType` (415), `sendError` (500).
 
 ### Хендлеры
 
-**Общее:**
-- `POST`: `idNumber <= 0` → создание (`setIdNumber(0)`, `addXxx`, `201` + `Location`).
-  `idNumber > 0` → update, `200 OK` (кроме `EpicsHandler` — `400`).
-- `DELETE` → `204 No Content`.
-- Неверный `Content-Type` → `415`.
-- Неподдерживаемый метод → `405` + `Allow`.
-- Пересечение интервалов → `409`.
+**Общее:** POST создание → 201 + Location, обновление → 200 (кроме `EpicsHandler`
+— 400), DELETE → 204, неверный `Content-Type` → 415, неподдерживаемый метод → 405,
+пересечение интервалов → 409, пустой список → 200 + [].
 
 ### `CommaSeparatedValuesCreateProcess`
 
-```
-String toString(Task) / toString(Subtask) / toString(Epic)
-Task getTaskFromStrings(String[])
-Subtask getSubtaskFromStrings(String[])
-Epic getEpicFromStrings(String[])
-String getHeadersForCSV()
-```
-
-`setFieldsFromStrings` проверяет `fields.length >= 10` и ловит
-`NumberFormatException`.
+Как в этапе 4.
 
 ### Enums
 
-- `StatusProgress`: `NEW`, `IN_PROGRESS`, `DONE`.
-- `TypesTasks`: `TASK`, `EPIC`, `SUBTASK`.
-- `HttpResponseCode`: `OK(200)`, `CREATED(201)`, `NO_CONTENT(204)`,
-  `BAD_REQUEST(400)`, `NOT_FOUND(404)`, `METHOD_NOT_ALLOWED(405)`,
-  `CONFLICT(409)`, `UNSUPPORTED_MEDIA_TYPE(415)`, `INTERNAL_SERVER_ERROR(500)`.
+- `StatusProgress`: NEW, IN_PROGRESS, DONE.
+- `TypesTasks`: TASK, EPIC, SUBTASK.
+- `HttpResponseCode`: 200, 201, 204, 400, 404, 405, 409, 415, 500.
 - `ResultOfOperation`: 13 значений.
 
 ## Что уже сделано
 
 ### Этапы 0-1-2 закрыты (PR #8, тег `v0.2-fixes`)
 
-**Этап 0 — Maven:** pom.xml, wrapper, `.gitattributes`, Maven-layout,
-`Main` → `TaskTrackerApplication`, logback.xml, удалены lib/ и out/.
-
-**Этап 1 — баг-фиксы:** NPE в `AbstractTask()`, `Epic.SubtaskFields`
-equals/hashCode, bounds-check в CSV, null-check в десериализаторе,
-`toString` в 4 классах, дедупликация валидации в `Subtask`, SLF4J.
-
-**Этап 2 — code smells:** `AppConfig`, убраны mutable-поля
-`taskForWork`/`epicForWork`/`subtaskForWork`, сортировка CSV, удалён
-`DataForUserScenario`, `getAllSubtasksFromEpic` через данные эпика,
-перегруженный `getFileBackedTaskManager(File)`. Плюс:
-- POST без `id` создаёт ресурс.
-- NPE в `FileBackedTaskManager.save` для файла без родителя.
+Maven + wrapper, Maven-layout, `Main` → `TaskTrackerApplication`, logback.
+Баг-фиксы: NPE в `AbstractTask()`, `Epic.SubtaskFields` equals/hashCode,
+bounds-check в CSV, null-check в десериализаторе, `toString` в 4 классах,
+дедупликация `Subtask`, SLF4J. Code smells: `AppConfig`, убраны mutable-поля,
+сортировка CSV, удалён `DataForUserScenario`, `getAllSubtasksFromEpic` через данные
+эпика. Плюс: POST без `id` создаёт ресурс, NPE в `save` для файла без родителя.
 
 ### Этап 3 закрыт (PR #9, тег `v0.3-http`)
 
-- `HttpResponseCode`: +204, 405, 409, 415.
-- `BaseHttpHandler`: константа `CONTENT_TYPE_JSON`, хелперы
-  `sendNoContent`, `sendConflict`, `sendMethodNotAllowed`,
-  `sendUnsupportedMediaType`. Content-Type ошибок → `application/json`.
-- `POST` создание → `201` + `Location`. Обновление → `200`.
-- `DELETE` → `204`.
-- Пересечение → `409` (было `406`).
-- Неверный `Content-Type` → `415`.
-- Неподдерживаемый метод → `405` + `Allow`.
-- Пустой список `GET /tasks|/subtasks|/epics` → `200 + []`.
+HTTP-семантика: 201+Location на создание, 200 на update, 204 на delete,
+409 на пересечение, 415 на неверный Content-Type, 405 на метод, 200+[] на пустом
+списке. `sendHasInteractions` и `NOT_ACCEPTABLE` удалены в этапе 4.
 
-### Этап 4 закрыт (ветка `develop-stage-4-storage`, ждёт merge)
+### Этап 4 закрыт (PR #10, тег `v0.4-storage`)
 
-- **Интерфейс `TaskStorage`** + record `LoadedState`.
-- **Реализации:** `NoopStorage` (no-op), `CsvStorage` (CSV).
-- **`TaskManager`** — бывший `InMemoryTaskManager`, теперь принимает
-  `TaskStorage` в конструкторе, вызывает `storage.save(...)` после
-  каждой мутации, `initFromStorage()` — при создании, `verifyIntegrity()` —
-  удаляет orphan-подзадачи (ссылающиеся на несуществующий эпик) с warn-логом.
-- **`FileBackedTaskManager` удалён.** Логика перенесена в `CsvStorage`.
-- **`TaskViewHistory`** — бывший `InMemoryHistoryManager`.
-- **Интерфейсы `TaskManager` и `HistoryManager` удалены.** Полиморфизм
-  переехал на `TaskStorage`.
-- **`sendHasInteractions` и `NOT_ACCEPTABLE` удалены.**
-- **Тесты:** `FileBackedTaskManagerTest` и `InMemoryTaskManagerTest` удалены;
-  `TaskManagerTest` и `TaskViewHistoryTest` переехали в пакет `service`
-  (первый — конкретный, второй — самостоятельный, без наследования от
-  `TaskManagerTest`).
-- **Количество тестов:** 102 (было 200 — ушли дублирующиеся прогоны
-  `TaskManagerTest` через `InMemoryHistoryManagerTest` и удалённый
-  `FileBackedTaskManagerTest`).
+`TaskStorage` + `LoadedState`, `NoopStorage` + `CsvStorage`.
+`InMemoryTaskManager` → `TaskManager`, `InMemoryHistoryManager` → `TaskViewHistory`.
+`FileBackedTaskManager` удалён. Интерфейсы `TaskManager` и `HistoryManager` удалены.
+`initFromStorage()` + `verifyIntegrity()` (warn + удаление orphan-подзадач).
+Тесты: `FileBackedTaskManagerTest` и `InMemoryTaskManagerTest` удалены,
+`TaskManagerTest` и `TaskViewHistoryTest` в `service`.
+
+### Этап 5 закрыт (ветка `develop-stage-5-concurrency`, ждёт merge)
+
+- **Генерация id:** монотонный `nextId`, без переиспользования. Убраны
+  `counterForIdNumber` и `isRestarted`. `initFromStorage` восстанавливает
+  `nextId = max(existing ids)`. Пользовательские id (заданные вручную) —
+  `nextId = max(nextId, id)`.
+- **Concurrent-коллекции:** `ConcurrentHashMap` для `tasks`/`epics`/`subtasks`,
+  `ConcurrentHashMap.newKeySet()` для `allIdInWork`, `ConcurrentSkipListSet` для
+  `prioritizedTasks`.
+- **Единый лок `private final Object lock`:** все мутационные методы обёрнуты
+  в `synchronized (lock)`. Проверки, зависящие от общего состояния, — под локом.
+  `persist()` — вне лока.
+- **`TaskViewHistory`:** методы `addRecord`/`removeRecord`/`getHistory` —
+  `synchronized`. Порядок локов: `TaskManager.lock` → монитор истории.
+- **Javadoc на `TaskManager`** — атомарность, персистенция, порядок захвата локов,
+  исключение deadlock.
+- **`HttpTaskServer`:** явный `ExecutorService` (`newFixedThreadPool(8)`),
+  `setExecutor`, в `stop()` — `shutdownNow()` + `awaitTermination(1s)`.
+- **Тест `TaskManagerConcurrencyTest`:** 16 потоков × 50 задач = 800 параллельных
+  `addTask`. Проверяет: все SUCCESS, все 800 задач в менеджере, все id уникальны.
+
+**Тестов:** 103 (BUILD SUCCESS).
 
 ## Что делаем сейчас
 
-**Активный этап:** Этап 5 — потокобезопасность.
-**Ветка:** будет `develop-stage-5-concurrency` (создать от main после merge).
+**Активный этап:** Этап 6 — расширение API (опционально).
+**Ветка:** будет `develop-stage-6-api` (создать от main после merge).
 
-### Этап 5 — план
+### Этап 6 — план (все пункты опциональны)
 
-1. Заменить `HashMap` на `ConcurrentHashMap` для `tasks`, `epics`, `subtasks`.
-   `HashSet` → `ConcurrentHashMap.newKeySet()` для `allIdInWork`.
-   `TreeSet` → `ConcurrentSkipListSet` для `prioritizedTasks`.
-2. Точечные `synchronized`:
-    - `generateIdNumber` + добавление в `allIdInWork` + `put` в мапу —
-      один synchronized-блок (чтобы не было двух задач с одним id).
-    - Проверка пересечения + добавление в `prioritizedTasks` — тоже synchronized.
-    - `persist()` — вне synchronized, но с копией коллекций (snapshot),
-      чтобы не держать блокировку при I/O.
-    - Чтения (`getXxx`) — без synchronized, `ConcurrentHashMap` сам атомарен.
-3. `HttpTaskServer` — явный `ExecutorService`:
-   `httpServer.setExecutor(Executors.newFixedThreadPool(8))`.
-   Пул создаётся в конструкторе, закрывается в `stop()`.
-4. Javadoc на `TaskManager` — какие операции атомарны, какие нет.
+1. **Пагинация** для `GET /tasks | /subtasks | /epics`:
+   `?from=0&size=20&status=NEW&sortBy=startDateTime`.
+   Реализация: фильтрация + сортировка + пагинация в стриме.
+2. **`GET /health`** → `200 {"status":"UP"}`.
+3. **`GET /version`** → `200 {"version":"0.2.0"}`.
+4. **`docs/openapi.yaml`** — ручная спека, без UI.
+5. Версионирование `/api/v1/...` — **НЕ ДЕЛАЕМ** (ломает текущие URL).
 
 ### Открытые мелочи
 
-- `isTimeIntersectBoth` и `isTimeIntersectWithOthers` пока public (нужны
-  тестам). Станут private в этапе 7, вместе с переработкой тестов.
-- `getTotalOfIdInWork` — public, нужен одному тесту. Возможно, станет
-  package-private в этапе 7, если тесты переедут в `service`.
-- `service/interfaces/` — пакет опустел, можно удалить директорию.
+- `isTimeIntersectBoth` и `isTimeIntersectWithOthers` — пока `public`, нужны
+  тестам. Станут `private` в этапе 7, если тесты переедут/изменятся.
+- `getTotalOfIdInWork` — `public`, нужен одному тесту.
+- `service/interfaces/` — директория опустела, можно удалить.
 - В тестах всё ещё есть `System.out.println` — убираются в этапе 7.
 
 ### Дальнейшие этапы
 
-- **Этап 6 (API, опционально):** пагинация, `/health`, `/version`, OpenAPI.
-- **Этап 7 (тесты):** переработка — конкретные исключения, детерминированное
-  время, порт 0, `@AfterEach`, тела ответов, разделение на contract/integration.
+- **Этап 7 (тесты):** переработка — конкретные исключения, детерминированное время,
+  порт 0, `@AfterEach`, тела ответов, разделение на contract/integration.
 - **Этап 8 (инфраструктура, опционально):** Checkstyle, SpotBugs, JaCoCo,
   GitHub Actions, Dockerfile, docker-compose.
 
@@ -432,9 +358,10 @@ equals/hashCode, bounds-check в CSV, null-check в десериализатор
 | 7 | Неверный `Content-Type` → 415 |
 | 8 | `Content-Type` ошибок → `application/json` |
 | 9 | Пустой список → 200 + `[]` |
-| 10 | Хранилище: `TaskStorage` + композиция (этап 4 — сделано) |
-| 11 | Потокобезопасность: `ConcurrentHashMap` + `synchronized` (этап 5) |
-| 12 | Менеджер без интерфейса; полиморфизм на `TaskStorage` (этап 4 — сделано) |
+| 10 | Хранилище: `TaskStorage` + композиция |
+| 11 | Потокобезопасность: `ConcurrentHashMap` + единый `synchronized (lock)` |
+| 12 | Менеджер без интерфейса; полиморфизм на `TaskStorage` |
+| 13 | Генерация id: монотонный счётчик, без переиспользования |
 
 ## Модель ветвления и тегов
 
@@ -443,20 +370,17 @@ equals/hashCode, bounds-check в CSV, null-check в десериализатор
 - После этапа: PR на GitHub (base `main`), merge commit, тег на merge-коммит.
 
 **Теги:**
-- `v0.1-before-refactor`, `v0.2-fixes`, `v0.3-http` — на main.
-- `v0.4-storage` — после merge текущей ветки.
-- `v0.5-concurrency`, `v0.6-api`, `v0.7-tests`, `v1.0-portfolio` — в будущем.
+- `v0.1-before-refactor`, `v0.2-fixes`, `v0.3-http`, `v0.4-storage` — на main.
+- `v0.5-concurrency` — после merge текущей ветки.
+- `v0.6-api`, `v0.7-tests`, `v1.0-portfolio` — в будущем.
 
 ## Соглашения по коду и тестам
 
 - Отвечать по-русски.
-- **Тесты:**
-    - `@Nested`, `@DisplayName`, имена `methodName_Should_ExpectedBehavior_Test`.
-    - `assertThrows` — только с конкретными типами исключений.
-    - Без `System.out.println` (в этапе 7 убираем).
-    - Детерминированное время, не `now()` (в этапе 7).
-    - `@AfterEach` для temp-файлов (в этапе 7).
-    - HTTP-тесты — на порту 0 (в этапе 7).
+- **Тесты:** `@Nested`, `@DisplayName`, имена `methodName_Should_ExpectedBehavior_Test`.
+  `assertThrows` — только с конкретными типами исключений. Без `System.out.println`
+  (в этапе 7). Детерминированное время, не `now()` (в этапе 7). `@AfterEach` для
+  temp-файлов (в этапе 7). HTTP-тесты на порту 0 (в этапе 7).
 - **Code fence:** для вложенных — четыре бэктика снаружи.
 - Файлы присылаются целиком; не выдумывать методы/поля.
 - **Gson** работает через no-arg конструктор + reflection.
@@ -474,17 +398,43 @@ equals/hashCode, bounds-check в CSV, null-check в десериализатор
 - `idNumber = -1` — маркер «пустышка». Gson даёт `-1` при POST без `id`;
   хендлеры нормализуют в `0` в ветке создания.
 
+### IDEA: тесты не запускаются через кнопку Run, но `./mvnw test` работает
+
+Симптом: при запуске отдельного теста из IDEA — `package org.junit.jupiter.api does not exist`.
+Через `./mvnw clean test` всё зелёно.
+
+Причина: IDEA использует свой native build system, а не Maven. После крупных
+изменений в `pom.xml` или перекладки исходников IDEA может потерять classpath.
+
+**Решение, которое сработало:**
+1. В правой панели Maven → правый клик по корневому проекту → **Unlink Maven Projects**.
+2. Правый клик по `pom.xml` → **Add as Maven Project**.
+
+Альтернативы (не помогли в этом случае, но помогают обычно):
+- **Reload All Maven Projects** (кнопка в панели Maven).
+- Проверить `Settings → Build → Build Tools → Maven → Ignored Files` — не
+  должен быть отмечен `pom.xml`.
+- `Settings → Build → Build Tools → Maven → Runner → Delegate IDE build/run actions to Maven`.
+- В крайнем случае — удалить `.idea/` и `*.iml`, открыть заново через `pom.xml`.
+
+### IDEA: Compact Middle Packages
+
+Чтобы дерево проекта не разъезжалось «лесенкой» (`ru → yandex → practicum → java → tasktracker`),
+включить **Compact Middle Packages**. Путь в новых версиях:
+`File → Settings → Advanced Settings → Project View → Compact Middle Packages`.
+В контекстном меню правого клика по папке этого пункта может не быть.
+
 ## Ожидаемое действие от ассистента в новом чате
 
-1. **Прочитать `context.md` целиком.** Понять: проект, стек, активный этап.
-2. **Подтвердить понимание в одном-двух предложениях:** какой этап активен,
-   что следующий, в какой ветке.
+1. **Прочитать `context.md` целиком.**
+2. **Подтвердить понимание в одном-двух предложениях:** активный этап, следующий
+   шаг, ветка.
 3. **Задать уточняющий вопрос:** «На какой стадии этапа мы сейчас? Что уже
-   закоммичено, что ещё нет?» — пользователь мог перейти в новый чат посреди работы.
-4. **Дождаться ответа.** Не начинать правки сразу.
-5. **Проверить актуальность.** Если сомнения — попросить текущие версии файлов.
-6. **Не выдумывать методы и поля.** Если нужен метод, а его нет в разделе
-   «Ключевые сигнатуры» — попросить файл.
+   закоммичено, что ещё нет?»
+4. **Дождаться ответа.**
+5. **Проверить актуальность.** При сомнениях — попросить текущие версии файлов.
+6. **Не выдумывать методы и поля.** Если нужен метод, а его нет в «Ключевых
+   сигнатурах» — попросить файл.
 
 ## Как со мной работать
 
@@ -498,6 +448,5 @@ equals/hashCode, bounds-check в CSV, null-check в десериализатор
 - Отвечать по-русски.
 - Для ответов с вложенными code fence использовать четыре бэктика снаружи.
 - Коммиты — лаконичные, но информативные.
-- **Обновление `context.md` в конце каждого этапа:** новая версия подробнее
-  предыдущей, заменяет старую.
+- **Обновление `context.md` в конце каждого этапа.**
 - **PLAN.md** — локальный, в `.gitignore`, в репо не публикуется.
