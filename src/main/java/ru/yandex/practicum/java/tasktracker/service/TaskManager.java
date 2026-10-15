@@ -13,19 +13,51 @@ import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.stream.Collectors;
 
+/**
+ * Менеджер задач: держит состояние в памяти, делегирует персистенцию в {@link TaskStorage}.
+ *
+ * <p><b>Потокобезопасность.</b> Все мутационные методы выполняются под единым внутренним
+ * локом ({@code lock}). Читающие методы лок не захватывают — коллекции представлены
+ * конкурентными реализациями ({@code ConcurrentHashMap}, {@code ConcurrentSkipListSet}),
+ * поэтому одиночные операции чтения атомарны.
+ *
+ * <p><b>Атомарность.</b> Под локом выполняются:
+ * <ul>
+ *   <li>проверки, зависящие от общего состояния (уникальность id, пересечение интервалов,
+ *       наличие родительского эпика);</li>
+ *   <li>генерация нового id и присвоение его объекту;</li>
+ *   <li>все изменения {@code tasks}, {@code epics}, {@code subtasks}, {@code allIdInWork},
+ *       {@code prioritizedTasks}.</li>
+ * </ul>
+ *
+ * <p><b>Персистенция.</b> {@code persist()} вызывается вне лока — чтобы не держать
+ * блокировку во время I/O. Состояние на момент вызова согласовано: все мутации уже
+ * применены под локом. Возможна ситуация, когда между снятием лока и вызовом
+ * {@code persist()} другой поток успеет внести своё изменение — тогда файл будет
+ * записан с частично устаревшим состоянием. В текущей архитектуре это допустимо:
+ * при следующей успешной мутации файл перезапишется.
+ *
+ * <p><b>Порядок захвата локов.</b> Если под локом менеджера вызываются методы
+ * {@link TaskViewHistory}, они дополнительно синхронизируются на собственном мониторе.
+ * Порядок всегда: <i>сначала lock менеджера, затем монитор истории</i>. Обратного
+ * пути нет — {@code TaskViewHistory} не знает о {@code TaskManager}. Это исключает
+ * циклическое ожидание (deadlock).
+ */
 public class TaskManager {
     private static final Logger log = LoggerFactory.getLogger(TaskManager.class);
-    private int counterForIdNumber;
-    private boolean isRestarted;
-    protected final HashSet<Integer> allIdInWork;
-    protected final HashMap<Integer, Task> tasks;
-    protected final HashMap<Integer, Epic> epics;
-    protected final HashMap<Integer, Subtask> subtasks;
-    protected final TreeSet<AbstractTask> prioritizedTasks;
+    private int nextId;
+    protected final Set<Integer> allIdInWork;
+    protected final Map<Integer, Task> tasks;
+    protected final Map<Integer, Epic> epics;
+    protected final Map<Integer, Subtask> subtasks;
+    protected final NavigableSet<AbstractTask> prioritizedTasks;
     private final TaskViewHistory historyManager;
     private final TaskStorage storage;
+    private final Object lock = new Object();
 
     public TaskManager() {
         this(new NoopStorage());
@@ -33,14 +65,13 @@ public class TaskManager {
 
     public TaskManager(TaskStorage storage) {
         this.storage = Objects.requireNonNull(storage, "'storage' can't be null");
-        tasks = new HashMap<>();
-        epics = new HashMap<>();
-        subtasks = new HashMap<>();
+        tasks = new ConcurrentHashMap<>();
+        epics = new ConcurrentHashMap<>();
+        subtasks = new ConcurrentHashMap<>();
         historyManager = ManagersUtil.getDefaultHistory();
-        counterForIdNumber = 1;
-        allIdInWork = new HashSet<>();
-        isRestarted = false;
-        prioritizedTasks = new TreeSet<>((task1, task2) -> {
+        nextId = 0;
+        allIdInWork = ConcurrentHashMap.newKeySet();
+        prioritizedTasks = new ConcurrentSkipListSet<>((task1, task2) -> {
             if (task1.getIdNumber() == task2.getIdNumber()) {
                 return 0;
             }
@@ -63,19 +94,19 @@ public class TaskManager {
             Task copy = new Task(task);
             tasks.put(copy.getIdNumber(), copy);
             allIdInWork.add(copy.getIdNumber());
-            counterForIdNumber = Math.max(counterForIdNumber, copy.getIdNumber() + 1);
+            nextId = Math.max(nextId, copy.getIdNumber());
         }
         for (Epic epic : state.epics()) {
             Epic copy = new Epic(epic);
             epics.put(copy.getIdNumber(), copy);
             allIdInWork.add(copy.getIdNumber());
-            counterForIdNumber = Math.max(counterForIdNumber, copy.getIdNumber() + 1);
+            nextId = Math.max(nextId, copy.getIdNumber());
         }
         for (Subtask subtask : state.subtasks()) {
             Subtask copy = new Subtask(subtask);
             subtasks.put(copy.getIdNumber(), copy);
             allIdInWork.add(copy.getIdNumber());
-            counterForIdNumber = Math.max(counterForIdNumber, copy.getIdNumber() + 1);
+            nextId = Math.max(nextId, copy.getIdNumber());
         }
 
         for (Subtask subtask : subtasks.values()) {
@@ -104,18 +135,10 @@ public class TaskManager {
     }
 
     private ResultOfOperation generateIdNumber() {
-        while (allIdInWork.contains(counterForIdNumber)) {
-            counterForIdNumber++;
-            if (counterForIdNumber == Integer.MAX_VALUE) {
-                if (isRestarted) {
-                    return ResultOfOperation.ERROR_NO_AVAILABLE_ID;
-                } else {
-                    counterForIdNumber = 1;
-                    isRestarted = true;
-                }
-            }
+        if (nextId == Integer.MAX_VALUE) {
+            return ResultOfOperation.ERROR_NO_AVAILABLE_ID;
         }
-        isRestarted = false;
+        nextId++;
         return ResultOfOperation.SUCCESS;
     }
 
@@ -206,26 +229,34 @@ public class TaskManager {
             return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
         } else if (task.getIdNumber() < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
-        } else if (allIdInWork.contains(task.getIdNumber())) {
-            return ResultOfOperation.ERROR_OBJECT_ALREADY_EXISTS;
-        } else if (isTimeIntersectWithOthers(task)) {
-            return ResultOfOperation.ERROR_INTERSECT_TIME;
         }
 
         Task taskForWork = new Task(task);
 
-        if (taskForWork.getIdNumber() == 0) {
-            if (generateIdNumber() == ResultOfOperation.SUCCESS) {
-                taskForWork.setIdNumber(counterForIdNumber);
-                task.setIdNumber(counterForIdNumber);
-            } else {
-                return ResultOfOperation.ERROR_NO_AVAILABLE_ID;
+        synchronized (lock) {
+            if (allIdInWork.contains(taskForWork.getIdNumber())) {
+                return ResultOfOperation.ERROR_OBJECT_ALREADY_EXISTS;
             }
+            if (isTimeIntersectWithOthers(taskForWork)) {
+                return ResultOfOperation.ERROR_INTERSECT_TIME;
+            }
+
+            if (taskForWork.getIdNumber() == 0) {
+                if (generateIdNumber() == ResultOfOperation.SUCCESS) {
+                    taskForWork.setIdNumber(nextId);
+                    task.setIdNumber(nextId);
+                } else {
+                    return ResultOfOperation.ERROR_NO_AVAILABLE_ID;
+                }
+            } else {
+                nextId = Math.max(nextId, taskForWork.getIdNumber());
+            }
+
+            tasks.put(taskForWork.getIdNumber(), taskForWork);
+            allIdInWork.add(taskForWork.getIdNumber());
+            addToPriorityList(taskForWork);
         }
 
-        tasks.put(taskForWork.getIdNumber(), taskForWork);
-        allIdInWork.add(taskForWork.getIdNumber());
-        addToPriorityList(taskForWork);
         persist();
         return ResultOfOperation.SUCCESS;
     }
@@ -237,17 +268,20 @@ public class TaskManager {
     }
 
     public ResultOfOperation removeAllTasks() {
-        if (tasks.isEmpty()) {
-            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
+        synchronized (lock) {
+            if (tasks.isEmpty()) {
+                return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
+            }
+
+            tasks.entrySet().forEach(entry -> {
+                historyManager.removeRecord(entry.getKey());
+                prioritizedTasks.remove(entry.getValue());
+            });
+
+            allIdInWork.removeAll(tasks.keySet());
+            tasks.clear();
         }
 
-        tasks.entrySet().forEach(entry -> {
-                    historyManager.removeRecord(entry.getKey());
-                    prioritizedTasks.remove(entry.getValue());
-        });
-
-        allIdInWork.removeAll(tasks.keySet());
-        tasks.clear();
         persist();
         return ResultOfOperation.SUCCESS;
     }
@@ -266,29 +300,38 @@ public class TaskManager {
         } else if (task.getName().isEmpty() || task.getDescription().isEmpty()
                 || task.getStatusProgress() == null) {
             return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
-        } else if (task.getIdNumber() <= 0 || tasks.isEmpty() || tasks.containsKey(task.getIdNumber()) == false) {
-            throw new NotFoundException(String.format("Task (id: %d) for 'update' not found", task.getIdNumber()));
-        } else if (isTimeIntersectWithOthers(task)) {
-            return ResultOfOperation.ERROR_INTERSECT_TIME;
         }
 
-        prioritizedTasks.remove(tasks.get(task.getIdNumber()));
-        Task taskForWork = new Task(task);
-        tasks.put(taskForWork.getIdNumber(), taskForWork);
-        addToPriorityList(taskForWork);
+        synchronized (lock) {
+            if (task.getIdNumber() <= 0 || tasks.isEmpty() || tasks.containsKey(task.getIdNumber()) == false) {
+                throw new NotFoundException(String.format("Task (id: %d) for 'update' not found", task.getIdNumber()));
+            }
+            if (isTimeIntersectWithOthers(task)) {
+                return ResultOfOperation.ERROR_INTERSECT_TIME;
+            }
+
+            prioritizedTasks.remove(tasks.get(task.getIdNumber()));
+            Task taskForWork = new Task(task);
+            tasks.put(taskForWork.getIdNumber(), taskForWork);
+            addToPriorityList(taskForWork);
+        }
+
         persist();
         return ResultOfOperation.SUCCESS;
     }
 
     public ResultOfOperation removeTaskByIdNumber(int taskIdNumber) throws NotFoundException {
-        if (taskIdNumber <= 0 || tasks.isEmpty() || tasks.containsKey(taskIdNumber) == false) {
-            throw new NotFoundException(String.format("Task (id: %d) for 'remove' not found", taskIdNumber));
+        synchronized (lock) {
+            if (taskIdNumber <= 0 || tasks.isEmpty() || tasks.containsKey(taskIdNumber) == false) {
+                throw new NotFoundException(String.format("Task (id: %d) for 'remove' not found", taskIdNumber));
+            }
+
+            prioritizedTasks.remove(tasks.get(taskIdNumber));
+            tasks.remove(taskIdNumber);
+            historyManager.removeRecord(taskIdNumber);
+            allIdInWork.remove(taskIdNumber);
         }
 
-        prioritizedTasks.remove(tasks.get(taskIdNumber));
-        tasks.remove(taskIdNumber);
-        historyManager.removeRecord(taskIdNumber);
-        allIdInWork.remove(taskIdNumber);
         persist();
         return ResultOfOperation.SUCCESS;
     }
@@ -302,31 +345,39 @@ public class TaskManager {
             return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
         } else if (epic.getIdNumber() < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
-        } else if (allIdInWork.contains(epic.getIdNumber())) {
-            return ResultOfOperation.ERROR_OBJECT_ALREADY_EXISTS;
-        } else if (epic.getSubtasksIdNumber().isEmpty() == false) {
-            return ResultOfOperation.ERROR_SUBTASKS_NOT_EMPTY;
         }
 
         Epic epicForWork;
-        if (epic.getIdNumber() == 0) {
-            if (epic.getDurationInMinutes() != 0 || epic.getStartDateTime().isPresent()
-                    || epic.getEndDateTime().isPresent()) {
-                return ResultOfOperation.ERROR_OBJECT_ILLEGAL;
+
+        synchronized (lock) {
+            if (allIdInWork.contains(epic.getIdNumber())) {
+                return ResultOfOperation.ERROR_OBJECT_ALREADY_EXISTS;
             }
-            epicForWork = new Epic(epic.getName().get(), epic.getDescription().get());
-            if (generateIdNumber() == ResultOfOperation.SUCCESS) {
-                epicForWork.setIdNumber(counterForIdNumber);
-                epic.setIdNumber(counterForIdNumber);
+            if (epic.getSubtasksIdNumber().isEmpty() == false) {
+                return ResultOfOperation.ERROR_SUBTASKS_NOT_EMPTY;
+            }
+
+            if (epic.getIdNumber() == 0) {
+                if (epic.getDurationInMinutes() != 0 || epic.getStartDateTime().isPresent()
+                        || epic.getEndDateTime().isPresent()) {
+                    return ResultOfOperation.ERROR_OBJECT_ILLEGAL;
+                }
+                epicForWork = new Epic(epic.getName().get(), epic.getDescription().get());
+                if (generateIdNumber() == ResultOfOperation.SUCCESS) {
+                    epicForWork.setIdNumber(nextId);
+                    epic.setIdNumber(nextId);
+                } else {
+                    return ResultOfOperation.ERROR_NO_AVAILABLE_ID;
+                }
             } else {
-                return ResultOfOperation.ERROR_NO_AVAILABLE_ID;
+                epicForWork = new Epic(epic);
+                nextId = Math.max(nextId, epicForWork.getIdNumber());
             }
-        } else {
-            epicForWork = new Epic(epic);
+
+            epics.put(epicForWork.getIdNumber(), epicForWork);
+            allIdInWork.add(epicForWork.getIdNumber());
         }
 
-        epics.put(epicForWork.getIdNumber(), epicForWork);
-        allIdInWork.add(epicForWork.getIdNumber());
         persist();
         return ResultOfOperation.SUCCESS;
     }
@@ -356,11 +407,15 @@ public class TaskManager {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
         } else if (newEpicName == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
-        } else if (epics.isEmpty() || epics.containsKey(epicIdNumber) == false) {
-            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
         }
 
-        epics.get(epicIdNumber).setName(newEpicName);
+        synchronized (lock) {
+            if (epics.isEmpty() || epics.containsKey(epicIdNumber) == false) {
+                return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
+            }
+            epics.get(epicIdNumber).setName(newEpicName);
+        }
+
         persist();
         return ResultOfOperation.SUCCESS;
     }
@@ -370,32 +425,39 @@ public class TaskManager {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
         } else if (newEpicDescription == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
-        } else if (epics.isEmpty() || epics.containsKey(epicIdNumber) == false) {
-            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
         }
 
-        epics.get(epicIdNumber).setDescription(newEpicDescription);
+        synchronized (lock) {
+            if (epics.isEmpty() || epics.containsKey(epicIdNumber) == false) {
+                return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
+            }
+            epics.get(epicIdNumber).setDescription(newEpicDescription);
+        }
+
         persist();
         return ResultOfOperation.SUCCESS;
     }
 
     public ResultOfOperation removeAllEpics() {
-        if (epics.isEmpty()) {
-            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
+        synchronized (lock) {
+            if (epics.isEmpty()) {
+                return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
+            }
+
+            if (subtasks.isEmpty() == false) {
+                allIdInWork.removeAll(subtasks.keySet());
+                subtasks.entrySet().forEach(entry -> {
+                    historyManager.removeRecord(entry.getKey());
+                    prioritizedTasks.remove(entry.getValue());
+                });
+                subtasks.clear();
+            }
+
+            epics.keySet().forEach(id -> historyManager.removeRecord(id));
+            allIdInWork.removeAll(epics.keySet());
+            epics.clear();
         }
 
-        if (subtasks.isEmpty() == false) {
-            allIdInWork.removeAll(subtasks.keySet());
-            subtasks.entrySet().forEach(entry -> {
-                historyManager.removeRecord(entry.getKey());
-                prioritizedTasks.remove(entry.getValue());
-            });
-            subtasks.clear();
-        }
-
-        epics.keySet().forEach(id -> historyManager.removeRecord(id));
-        allIdInWork.removeAll(epics.keySet());
-        epics.clear();
         persist();
         return ResultOfOperation.SUCCESS;
     }
@@ -409,23 +471,26 @@ public class TaskManager {
     }
 
     public ResultOfOperation removeEpicByIdNumber(int epicIdNumber) {
-        if (epicIdNumber <= 0 || epics.isEmpty() || epics.containsKey(epicIdNumber) == false) {
-            throw new NotFoundException(String.format("Epic (id: %d) for 'remove' not found", epicIdNumber));
+        synchronized (lock) {
+            if (epicIdNumber <= 0 || epics.isEmpty() || epics.containsKey(epicIdNumber) == false) {
+                throw new NotFoundException(String.format("Epic (id: %d) for 'remove' not found", epicIdNumber));
+            }
+
+            if (subtasks.isEmpty() == false) {
+                epics.get(epicIdNumber).getSubtasksIdNumber().orElseGet(ArrayList::new)
+                        .forEach(subtaskIdNumber -> {
+                            prioritizedTasks.remove(subtasks.get(subtaskIdNumber));
+                            subtasks.remove(subtaskIdNumber);
+                            allIdInWork.remove(subtaskIdNumber);
+                            historyManager.removeRecord(subtaskIdNumber);
+                        });
+            }
+
+            epics.remove(epicIdNumber);
+            allIdInWork.remove(epicIdNumber);
+            historyManager.removeRecord(epicIdNumber);
         }
 
-        if (subtasks.isEmpty() == false) {
-            epics.get(epicIdNumber).getSubtasksIdNumber().orElseGet(ArrayList::new)
-                    .forEach(subtaskIdNumber -> {
-                        prioritizedTasks.remove(subtasks.get(subtaskIdNumber));
-                        subtasks.remove(subtaskIdNumber);
-                        allIdInWork.remove(subtaskIdNumber);
-                        historyManager.removeRecord(subtaskIdNumber);
-                    });
-        }
-
-        epics.remove(epicIdNumber);
-        allIdInWork.remove(epicIdNumber);
-        historyManager.removeRecord(epicIdNumber);
         persist();
         return ResultOfOperation.SUCCESS;
     }
@@ -439,36 +504,45 @@ public class TaskManager {
             return ResultOfOperation.ERROR_OBJECT_FIELDS_NULL;
         } else if (subtask.getIdNumber() < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
-        } else if (allIdInWork.contains(subtask.getIdNumber())) {
-            return ResultOfOperation.ERROR_OBJECT_ALREADY_EXISTS;
-        } else if (epics.isEmpty() || epics.containsKey(subtask.getParentEpicIdNumber()) == false) {
-            return ResultOfOperation.ERROR_MISMATCH_PARENT_ID;
-        } else if (isTimeIntersectWithOthers(subtask)) {
-            return ResultOfOperation.ERROR_INTERSECT_TIME;
         }
 
-        Subtask subtaskForWork = new Subtask(subtask);
+        synchronized (lock) {
+            if (allIdInWork.contains(subtask.getIdNumber())) {
+                return ResultOfOperation.ERROR_OBJECT_ALREADY_EXISTS;
+            }
+            if (epics.isEmpty() || epics.containsKey(subtask.getParentEpicIdNumber()) == false) {
+                return ResultOfOperation.ERROR_MISMATCH_PARENT_ID;
+            }
+            if (isTimeIntersectWithOthers(subtask)) {
+                return ResultOfOperation.ERROR_INTERSECT_TIME;
+            }
 
-        if (subtaskForWork.getIdNumber() == 0) {
-            if (generateIdNumber() == ResultOfOperation.SUCCESS) {
-                subtaskForWork.setIdNumber(counterForIdNumber);
-                subtask.setIdNumber(counterForIdNumber);
+            Subtask subtaskForWork = new Subtask(subtask);
+
+            if (subtaskForWork.getIdNumber() == 0) {
+                if (generateIdNumber() == ResultOfOperation.SUCCESS) {
+                    subtaskForWork.setIdNumber(nextId);
+                    subtask.setIdNumber(nextId);
+                } else {
+                    return ResultOfOperation.ERROR_NO_AVAILABLE_ID;
+                }
             } else {
-                return ResultOfOperation.ERROR_NO_AVAILABLE_ID;
+                nextId = Math.max(nextId, subtaskForWork.getIdNumber());
+            }
+
+            Epic epicForWork = epics.get(subtaskForWork.getParentEpicIdNumber());
+            ResultOfOperation resultOfOperation = epicForWork.addSubtask(subtaskForWork);
+            if (resultOfOperation == ResultOfOperation.SUCCESS) {
+                subtasks.put(subtaskForWork.getIdNumber(), subtaskForWork);
+                allIdInWork.add(subtaskForWork.getIdNumber());
+                addToPriorityList(subtaskForWork);
+            } else {
+                return resultOfOperation;
             }
         }
 
-        Epic epicForWork = epics.get(subtaskForWork.getParentEpicIdNumber());
-        ResultOfOperation resultOfOperation = epicForWork.addSubtask(subtaskForWork);
-        if (resultOfOperation == ResultOfOperation.SUCCESS) {
-            subtasks.put(subtaskForWork.getIdNumber(), subtaskForWork);
-            allIdInWork.add(subtaskForWork.getIdNumber());
-            addToPriorityList(subtaskForWork);
-            persist();
-            return ResultOfOperation.SUCCESS;
-        } else {
-            return resultOfOperation;
-        }
+        persist();
+        return ResultOfOperation.SUCCESS;
     }
 
     public ArrayList<Subtask> getAllSubtasks() {
@@ -478,17 +552,20 @@ public class TaskManager {
     }
 
     public ResultOfOperation removeAllSubtasks() {
-        if (epics.isEmpty() || subtasks.isEmpty()) {
-            return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
+        synchronized (lock) {
+            if (epics.isEmpty() || subtasks.isEmpty()) {
+                return ResultOfOperation.ERROR_OBJECT_NOT_FOUND;
+            }
+
+            epics.values().forEach(epic -> epic.removeAllSubtasks());
+            subtasks.entrySet().forEach(entry -> {
+                historyManager.removeRecord(entry.getKey());
+                prioritizedTasks.remove(entry.getValue());
+            });
+            allIdInWork.removeAll(subtasks.keySet());
+            subtasks.clear();
         }
 
-        epics.values().forEach(epic -> epic.removeAllSubtasks());
-        subtasks.entrySet().forEach(entry -> {
-            historyManager.removeRecord(entry.getKey());
-            prioritizedTasks.remove(entry.getValue());
-        });
-        allIdInWork.removeAll(subtasks.keySet());
-        subtasks.clear();
         persist();
         return ResultOfOperation.SUCCESS;
     }
@@ -505,25 +582,31 @@ public class TaskManager {
 
 
     public ResultOfOperation removeSubtaskByIdNumber(int subtaskIdNumber) throws NotFoundException {
-        if (subtaskIdNumber <= 0 || epics.isEmpty() || subtasks.isEmpty() || subtasks.containsKey(subtaskIdNumber) == false) {
-            throw new NotFoundException(String.format("Subtask (id: %d) for 'remove' not found", subtaskIdNumber));
+        synchronized (lock) {
+            if (subtaskIdNumber <= 0 || epics.isEmpty() || subtasks.isEmpty()
+                    || subtasks.containsKey(subtaskIdNumber) == false) {
+                throw new NotFoundException(String.format("Subtask (id: %d) for 'remove' not found", subtaskIdNumber));
+            }
+
+            int parentEpicIdNumber = subtasks.get(subtaskIdNumber).getParentEpicIdNumber();
+            prioritizedTasks.remove(subtasks.get(subtaskIdNumber));
+            subtasks.remove(subtaskIdNumber);
+            historyManager.removeRecord(subtaskIdNumber);
+            allIdInWork.remove(subtaskIdNumber);
+
+            if (epics.containsKey(parentEpicIdNumber)) {
+                ResultOfOperation result = epics.get(parentEpicIdNumber).removeSubtask(subtaskIdNumber);
+                if (result != ResultOfOperation.SUCCESS) {
+                    return result;
+                }
+            } else {
+                throw new NotFoundException(String.format("Subtask (id: %d) for 'remove' not found: %s",
+                        subtaskIdNumber, ResultOfOperation.ERROR_MISMATCH_PARENT_ID.name()));
+            }
         }
 
-        int parentEpicIdNumber = subtasks.get(subtaskIdNumber).getParentEpicIdNumber();
-        prioritizedTasks.remove(subtasks.get(subtaskIdNumber));
-        subtasks.remove(subtaskIdNumber);
-        historyManager.removeRecord(subtaskIdNumber);
-        allIdInWork.remove(subtaskIdNumber);
-        if (epics.containsKey(parentEpicIdNumber)) {
-            ResultOfOperation result = epics.get(parentEpicIdNumber).removeSubtask(subtaskIdNumber);
-            if (result == ResultOfOperation.SUCCESS) {
-                persist();
-            }
-            return result;
-        } else {
-            throw new NotFoundException(String.format("Subtask (id: %d) for 'remove' not found: %s",
-                    subtaskIdNumber, ResultOfOperation.ERROR_MISMATCH_PARENT_ID.name()));
-        }
+        persist();
+        return ResultOfOperation.SUCCESS;
     }
 
     public ResultOfOperation updateSubtask(Subtask subtask) throws NotFoundException {
@@ -538,22 +621,29 @@ public class TaskManager {
         int subtaskParentEpicIdNumber = subtask.getParentEpicIdNumber();
         Subtask subtaskForWork = new Subtask(subtask);
 
-        if (subtaskIdNumber <= 0 || epics.isEmpty() || subtasks.isEmpty() || subtasks.containsKey(subtaskIdNumber) == false) {
-            throw new NotFoundException(String.format("Subtask (id: %d) for 'update' not found", subtask.getIdNumber()));
-        } else if (epics.containsKey(subtaskParentEpicIdNumber) == false
-                || subtasks.get(subtaskIdNumber).getParentEpicIdNumber() != subtaskParentEpicIdNumber) {
-            return ResultOfOperation.ERROR_MISMATCH_PARENT_ID;
-        } else if (isTimeIntersectWithOthers(subtaskForWork)) {
-            return ResultOfOperation.ERROR_INTERSECT_TIME;
+        synchronized (lock) {
+            if (subtaskIdNumber <= 0 || epics.isEmpty() || subtasks.isEmpty()
+                    || subtasks.containsKey(subtaskIdNumber) == false) {
+                throw new NotFoundException(String.format("Subtask (id: %d) for 'update' not found", subtask.getIdNumber()));
+            }
+            if (epics.containsKey(subtaskParentEpicIdNumber) == false
+                    || subtasks.get(subtaskIdNumber).getParentEpicIdNumber() != subtaskParentEpicIdNumber) {
+                return ResultOfOperation.ERROR_MISMATCH_PARENT_ID;
+            }
+            if (isTimeIntersectWithOthers(subtaskForWork)) {
+                return ResultOfOperation.ERROR_INTERSECT_TIME;
+            }
+
+            prioritizedTasks.remove(subtasks.get(subtaskIdNumber));
+            subtasks.put(subtaskIdNumber, subtaskForWork);
+            addToPriorityList(subtaskForWork);
+            ResultOfOperation result = epics.get(subtaskParentEpicIdNumber).updateSubtask(subtask);
+            if (result != ResultOfOperation.SUCCESS) {
+                return result;
+            }
         }
 
-        prioritizedTasks.remove(subtasks.get(subtaskIdNumber));
-        subtasks.put(subtaskIdNumber, subtaskForWork);
-        addToPriorityList(subtaskForWork);
-        ResultOfOperation result = epics.get(subtaskParentEpicIdNumber).updateSubtask(subtask);
-        if (result == ResultOfOperation.SUCCESS) {
-            persist();
-        }
-        return result;
+        persist();
+        return ResultOfOperation.SUCCESS;
     }
 }

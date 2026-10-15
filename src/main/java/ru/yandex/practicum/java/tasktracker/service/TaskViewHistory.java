@@ -13,7 +13,7 @@ public class TaskViewHistory {
     }
 
 
-    public ResultOfOperation addRecord(AbstractTask task) {
+    public synchronized ResultOfOperation addRecord(AbstractTask task) {
         if (task == null) {
             return ResultOfOperation.ERROR_OBJECT_NULL;
         }
@@ -24,7 +24,7 @@ public class TaskViewHistory {
     }
 
 
-    public ResultOfOperation removeRecord(int idNumber) {
+    public synchronized ResultOfOperation removeRecord(int idNumber) {
         if (idNumber < 0) {
             return ResultOfOperation.ERROR_ID_LESS_ZERO;
         }
@@ -35,7 +35,7 @@ public class TaskViewHistory {
     }
 
 
-    public ArrayList<AbstractTask> getHistory() {
+    public synchronized ArrayList<AbstractTask> getHistory() {
         return history.getListAllItem();
     }
 }
