@@ -18,7 +18,7 @@ public class Epic extends AbstractTask {
     private final HashMap<Integer, SubtaskFields> subtasksFields;
     private LocalDateTime endDateTime;
 
-    private class SubtaskFields {
+    private static class SubtaskFields {
         StatusProgress subtaskStatusProgress;
         Duration subtaskDurationInMinutes;
         LocalDateTime subtaskStartDateTime;

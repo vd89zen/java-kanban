@@ -1,9 +1,32 @@
 package ru.yandex.practicum.java.tasktracker.config;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
+
 public final class AppConfig {
 
     private static final int DEFAULT_SERVER_PORT = 8080;
     private static final String DEFAULT_DATA_FILE = "tasks.csv";
+
+    private static final String VERSION_PROPERTIES = "app.properties";
+    private static final String VERSION_KEY = "app.version";
+    private static final String DEFAULT_VERSION = "unknown";
+
+    public static String getVersion() {
+        try (InputStream inputStream = AppConfig.class.getClassLoader()
+                .getResourceAsStream(VERSION_PROPERTIES)) {
+            if (inputStream == null) {
+                return DEFAULT_VERSION;
+            }
+            Properties properties = new Properties();
+            properties.load(inputStream);
+            String version = properties.getProperty(VERSION_KEY);
+            return version != null && !version.isBlank() ? version : DEFAULT_VERSION;
+        } catch (IOException exception) {
+            return DEFAULT_VERSION;
+        }
+    }
 
     private AppConfig() {
     }
@@ -38,9 +61,5 @@ public final class AppConfig {
             throw new IllegalArgumentException(
                     "Invalid integer value for " + envName + "/" + sysPropName + ": " + value, exception);
         }
-    }
-
-    public static String getVersion() {
-        return "0.2.0";
     }
 }

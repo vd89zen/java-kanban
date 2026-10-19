@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+
+    <!--
+    CT_CONSTRUCTOR_THROW: "finalizer attack" — конструктор бросает исключение,
+    объект остаётся частично инициализированным. Актуально только для классов
+    с finalize(). В Java 17 finalize() deprecated (JEP 421), в Java 18+ удалён.
+    В проекте нет ни одного finalize(), поэтому атака невозможна.
+    -->
+    <Match>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
+
+    <!--
+    EI_EXPOSE_REP: LoadedState — record, простой data-carrier для передачи
+    коллекций из CsvStorage.load() в TaskManager.initFromStorage().
+    Мутации коллекций после создания не предполагаются.
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Class name="ru.yandex.practicum.java.tasktracker.storage.LoadedState"/>
+    </Match>
+
+    <!--
+    EI_EXPOSE_REP2: LoadedState — то же, сохранение коллекций в конструкторе.
+    BaseHttpHandler — хранение ссылки на TaskManager, это дизайн: менеджер
+    шарится между всеми хендлерами.
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="ru.yandex.practicum.java.tasktracker.storage.LoadedState"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="ru.yandex.practicum.java.tasktracker.http.handler.BaseHttpHandler"/>
+    </Match>
+
+    <!--
+    MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR: false positive.
+    В TaskManager.initFromStorage() вызывается getIdNumber() у Task/Epic/Subtask.
+    TaskManager не наследует AbstractTask, поэтому getIdNumber() не может
+    быть переопределён в подклассе TaskManager.
+    -->
+    <Match>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+        <Class name="ru.yandex.practicum.java.tasktracker.service.TaskManager"/>
+    </Match>
+
+    <!--
+    URF_UNREAD_FIELD: поля-индексы headerType, headerChildSubtasks, headerEndDateTime
+    в CommaSeparatedValuesCreateProcess не читаются (парсинг идёт через
+    HEADER_TYPE_INDEX в CsvStorage), но нужны как документация: все 10 колонок
+    CSV объявлены в одном месте.
+    -->
+    <Match>
+        <Bug pattern="URF_UNREAD_FIELD"/>
+        <Class name="ru.yandex.practicum.java.tasktracker.utils.CommaSeparatedValuesCreateProcess"/>
+    </Match>
+
+</FindBugsFilter>

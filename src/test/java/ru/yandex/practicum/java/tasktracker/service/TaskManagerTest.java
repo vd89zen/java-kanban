@@ -24,31 +24,31 @@ class TaskManagerTest {
     protected Task expectedTask;
     protected Subtask actualSubtask;
     protected Subtask expectedSubtask;
-    protected final String DESCRIPTION = "description";
+    private static final String DESCRIPTION = "description";
     protected Task baseTask1;
-    protected final String BASE_TASK_1_NAME = "baseTask1";
-    protected final Integer BASE_TASK_1_ID = 1;
+    private static final String BASE_TASK_1_NAME = "baseTask1";
+    private static final Integer BASE_TASK_1_ID = 1;
     protected Task baseTask2;
-    protected final String BASE_TASK_2_NAME = "baseTask2";
-    protected final Integer BASE_TASK_2_ID = 3;
+    private static final String BASE_TASK_2_NAME = "baseTask2";
+    private static final Integer BASE_TASK_2_ID = 3;
     protected Epic baseEpic1;
-    protected final String BASE_EPIC_1_NAME = "baseEpic1";
-    protected final Integer BASE_EPIC_1_ID = 5;
+    private static final String BASE_EPIC_1_NAME = "baseEpic1";
+    private static final Integer BASE_EPIC_1_ID = 5;
     protected Epic baseEpic2;
-    protected final String BASE_EPIC_2_NAME = "baseEpic2";
-    protected final Integer BASE_EPIC_2_ID = 7;
+    private static final String BASE_EPIC_2_NAME = "baseEpic2";
+    private static final Integer BASE_EPIC_2_ID = 7;
     protected Subtask baseSubtask1;
-    protected final String BASE_SUBTASK_1_NAME = "baseSubtask1";
-    protected final Integer BASE_SUBTASK_1_ID = 9;
+    private static final String BASE_SUBTASK_1_NAME = "baseSubtask1";
+    private static final Integer BASE_SUBTASK_1_ID = 9;
     protected Subtask baseSubtask2;
-    protected final String BASE_SUBTASK_2_NAME = "baseSubtask2";
-    protected final Integer BASE_SUBTASK_2_ID = 11;
+    private static final String BASE_SUBTASK_2_NAME = "baseSubtask2";
+    private static final Integer BASE_SUBTASK_2_ID = 11;
     protected Subtask baseSubtask3;
-    protected final String BASE_SUBTASK_3_NAME = "baseSubtask3";
-    protected final Integer BASE_SUBTASK_3_ID = 13;
+    private static final String BASE_SUBTASK_3_NAME = "baseSubtask3";
+    private static final Integer BASE_SUBTASK_3_ID = 13;
     protected Epic baseEpicWithoutSubtask;
-    protected final String BASE_EPIC_WITHOUT_SUBTASK_NAME = "baseEpicWithoutSubtask";
-    protected final Integer BASE_EPIC_WITHOUT_SUBTASK_ID = 15;
+    private static final String BASE_EPIC_WITHOUT_SUBTASK_NAME = "baseEpicWithoutSubtask";
+    private static final Integer BASE_EPIC_WITHOUT_SUBTASK_ID = 15;
 
     @BeforeEach
     public void prepareForTest() {
@@ -79,7 +79,7 @@ class TaskManagerTest {
 
     @Nested
     @DisplayName("Тесты методов для работы с Task.")
-    class testForTask {
+    class TestForTask {
         @Test
         @DisplayName("Проверяем невозможность добавить Task со значением null")
         void addTask_Null_Test() {
@@ -258,7 +258,7 @@ class TaskManagerTest {
 
     @Nested
     @DisplayName("Тесты методов для работы с Epic.")
-    class testForEpic {
+    class TestForEpic {
         @Test
         @DisplayName("Проверяем добавление Epic без заданного ID")
         void addEpic_Without_IdNumber_Test() {
@@ -296,7 +296,7 @@ class TaskManagerTest {
 
         @Test
         @DisplayName("Проверяем изменение статуса Epic после обновления статуса Subtask")
-        void epic_Status_Progress_Update_Test(){
+        void epic_Status_Progress_Update_Test() {
             //Given
             StatusProgress expectedStatusProgress = StatusProgress.DONE;
             String messageIfFail = "Если подазадчи DONE, эпик должен быть DONE";
@@ -550,7 +550,7 @@ class TaskManagerTest {
 
     @Nested
     @DisplayName("Тесты методов для работы с Subtask.")
-    class testForSubtask {
+    class TestForSubtask {
         @Test
         @DisplayName("Проверяем невозможность добавить Subtask уже имеющийся в базе Менеджера")
         void addSubtask_Already_In_Manager_Test() {
