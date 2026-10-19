@@ -31,7 +31,7 @@ public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
                 if (splitPath.length == 3) {
                     int id;
                     try {
-                        id = Integer.valueOf(splitPath[2]);
+                        id = Integer.parseInt(splitPath[2]);
                     } catch (NumberFormatException numberFormatException) {
                         throw new BadRequestException("The ID number format is incorrect: it must be a positive number.");
                     }
@@ -106,7 +106,7 @@ public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
                 } else if (splitPath.length == 3) {
                     int id;
                     try {
-                        id = Integer.valueOf(splitPath[2]);
+                        id = Integer.parseInt(splitPath[2]);
                     } catch (NumberFormatException numberFormatException) {
                         throw new BadRequestException("The ID number format is incorrect: it must be a positive number.");
                     }
@@ -114,7 +114,7 @@ public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
                 } else if (splitPath.length == 4 && splitPath[3].equals("subtasks")) {
                     int id;
                     try {
-                        id = Integer.valueOf(splitPath[2]);
+                        id = Integer.parseInt(splitPath[2]);
                     } catch (NumberFormatException numberFormatException) {
                         throw new BadRequestException("The ID number format is incorrect: it must be a positive number.");
                     }

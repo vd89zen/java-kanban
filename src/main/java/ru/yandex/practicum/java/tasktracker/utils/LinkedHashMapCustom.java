@@ -54,9 +54,9 @@ public class LinkedHashMapCustom {
                 nodeCustomNextTaskIdNumber = nodeCustom.nextNode.task.getIdNumber();
             }
 
-            return task.getIdNumber() ==  nodeCustom.task.getIdNumber()
-                    && thisPreviousTaskIdNumber == nodeCustomPreviousTaskIdNumber
-                    && thisNextTaskIdNumber == nodeCustomNextTaskIdNumber;
+            return task.getIdNumber() == nodeCustom.task.getIdNumber()
+                    && Objects.equals(thisPreviousTaskIdNumber, nodeCustomPreviousTaskIdNumber)
+                    && Objects.equals(thisNextTaskIdNumber, nodeCustomNextTaskIdNumber);
         }
 
         @Override

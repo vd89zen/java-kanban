@@ -204,7 +204,7 @@ public class CommaSeparatedValuesCreateProcess {
         }
 
         try {
-            idNumber = Integer.valueOf(fields[headerId]);
+            idNumber = Integer.parseInt(fields[headerId]);
         } catch (NumberFormatException exception) {
             throw new RuntimeException("Неверный формат id: '" + fields[headerId] + "'");
         }
@@ -231,14 +231,14 @@ public class CommaSeparatedValuesCreateProcess {
                 break;
             default:
                 try {
-                    parentEpicIdNumber = Integer.valueOf(fields[headerParentEpic]);
+                    parentEpicIdNumber = Integer.parseInt(fields[headerParentEpic]);
                 } catch (NumberFormatException exception) {
                     throw new RuntimeException("Неверный формат parentEpic: '" + fields[headerParentEpic] + "'");
                 }
         }
 
         try {
-            durationInMinutes = Long.valueOf(fields[headerDurationInMinutes]);
+            durationInMinutes = Long.parseLong(fields[headerDurationInMinutes]);
         } catch (NumberFormatException exception) {
             throw new RuntimeException("Неверный формат durationInMinutes: '" + fields[headerDurationInMinutes] + "'");
         }

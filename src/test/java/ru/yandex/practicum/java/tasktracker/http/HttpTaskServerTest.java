@@ -2,6 +2,7 @@ package ru.yandex.practicum.java.tasktracker.http;
 
 import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.*;
+import ru.yandex.practicum.java.tasktracker.config.AppConfig;
 import ru.yandex.practicum.java.tasktracker.service.TaskManager;
 import ru.yandex.practicum.java.tasktracker.task.*;
 import ru.yandex.practicum.java.tasktracker.utils.AbstractTask;
@@ -56,7 +57,7 @@ class HttpTaskServerTest {
 
     @Nested
     @DisplayName("Тесты работы эндпоинтов /tasks.")
-    class testForTasks {
+    class TestForTasks {
         @Test
         @DisplayName("Проверяем эндпоинт 'DELETE /tasks{id}' - удаление Task.")
         void endpointTasks_Delete_Task_Test() throws IOException, InterruptedException {
@@ -608,7 +609,7 @@ class HttpTaskServerTest {
 
     @Nested
     @DisplayName("Тесты работы эндпоинтов /subtasks.")
-    class testForSubtasks {
+    class TestForSubtasks {
         @Test
         @DisplayName("Проверяем эндпоинт 'DELETE /subtasks{id}' - удаление Subtask.")
         void endpointSubtasks_Delete_Subtask_Test() throws IOException, InterruptedException {
@@ -937,7 +938,7 @@ class HttpTaskServerTest {
 
     @Nested
     @DisplayName("Тесты работы эндпоинтов /epics.")
-    class testForEpics {
+    class TestForEpics {
         @Test
         @DisplayName("Проверяем эндпоинт 'DELETE /epics{id}' - удаление Epic.")
         void endpointEpics_Delete_Epic_Test() throws IOException, InterruptedException {
@@ -1238,7 +1239,7 @@ class HttpTaskServerTest {
 
     @Nested
     @DisplayName("Тесты работы эндпоинтов /history.")
-    class testForHistory {
+    class TestForHistory {
         @Test
         @DisplayName("Проверяем эндпоинт 'GET /history' - получение истории.")
         void endpointHistory_Get_History_Test() throws IOException, InterruptedException {
@@ -1322,7 +1323,7 @@ class HttpTaskServerTest {
 
     @Nested
     @DisplayName("Тесты работы эндпоинтов /prioritized.")
-    class testForPrioritized {
+    class TestForPrioritized {
         @Test
         @DisplayName("Проверяем эндпоинт 'GET /prioritized' - получение списка приоритетных задач.")
         void endpointPrioritized_Get_Prioritized_Test() throws IOException, InterruptedException {
@@ -1409,7 +1410,7 @@ class HttpTaskServerTest {
 
     @Nested
     @DisplayName("Тесты работы эндпоинтов /health.")
-    class testForHealth {
+    class TestForHealth {
         @Test
         @DisplayName("Проверяем эндпоинт 'GET /health' - возвращает статус UP.")
         void endpointHealth_Get_Test() throws IOException, InterruptedException {
@@ -1455,13 +1456,13 @@ class HttpTaskServerTest {
 
     @Nested
     @DisplayName("Тесты работы эндпоинтов /version.")
-    class testForVersion {
+    class TestForVersion {
         @Test
         @DisplayName("Проверяем эндпоинт 'GET /version' - возвращает версию.")
         void endpointVersion_Get_Test() throws IOException, InterruptedException {
             //Given
             int expectedStatusCode = 200;
-            String expectedVersion = "0.2.0";
+            String expectedVersion = AppConfig.getVersion();
 
             HttpClient httpClient = HttpClient.newHttpClient();
             URI url = URI.create(baseUrl + "/version");

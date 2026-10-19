@@ -31,7 +31,7 @@ public class TasksHandler extends BaseHttpHandler implements HttpHandler {
                 if (splitPath.length == 3) {
                     int id;
                     try {
-                        id = Integer.valueOf(splitPath[2]);
+                        id = Integer.parseInt(splitPath[2]);
                     } catch (NumberFormatException numberFormatException) {
                         throw new BadRequestException("The ID number format is incorrect: it must be a positive number.");
                     }
@@ -98,6 +98,9 @@ public class TasksHandler extends BaseHttpHandler implements HttpHandler {
                             case ERROR_OBJECT_FIELDS_NULL:
                             case ERROR_ID_LESS_ZERO:
                                 sendBadRequest(httpExchange, gson.toJson(textForGson));
+                                break;
+                            default:
+                                break;
                         }
                     }
                 } else {
@@ -120,7 +123,7 @@ public class TasksHandler extends BaseHttpHandler implements HttpHandler {
                 } else if (splitPath.length == 3) {
                     int id;
                     try {
-                        id = Integer.valueOf(splitPath[2]);
+                        id = Integer.parseInt(splitPath[2]);
                     } catch (NumberFormatException numberFormatException) {
                         throw new BadRequestException("The ID number format is incorrect: it must be a positive number.");
                     }

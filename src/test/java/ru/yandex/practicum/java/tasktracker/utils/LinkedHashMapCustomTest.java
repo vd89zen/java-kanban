@@ -38,7 +38,7 @@ class LinkedHashMapCustomTest {
     }
 
     @BeforeEach
-    public void Prepare_For_Test() {
+    public void prepareForTest() {
         history = new LinkedHashMapCustom();
         baseTask1 = new Task(BASE_TASK_1_ID, BASE_TASK_1_NAME, DESCRIPTION, StatusProgress.NEW);
         baseTask2 = new Task(BASE_TASK_2_ID, BASE_TASK_2_NAME, DESCRIPTION, StatusProgress.NEW);
