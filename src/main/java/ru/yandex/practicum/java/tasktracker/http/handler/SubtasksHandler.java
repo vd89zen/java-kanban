@@ -11,6 +11,7 @@ import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
 import ru.yandex.practicum.java.tasktracker.service.TaskManager;
 import java.io.IOException;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class SubtasksHandler extends BaseHttpHandler implements HttpHandler {
 
@@ -108,7 +109,15 @@ public class SubtasksHandler extends BaseHttpHandler implements HttpHandler {
 
             if (requestMethod.equals("GET")) {
                 if (splitPath.length == 2) {
-                    sendText(httpExchange, gson.toJson(taskManager.getAllSubtasks()));
+                    QueryParams params = parseQueryParams(httpExchange);
+                    List<Subtask> result = taskManager.getAllSubtasks().stream()
+                            .filter(subtask -> params.status() == null
+                                    || subtask.getStatusProgress() == params.status())
+                            .sorted(comparatorFor(params.sortBy()))
+                            .skip(params.from())
+                            .limit(params.size())
+                            .collect(Collectors.toList());
+                    sendText(httpExchange, gson.toJson(result));
                 } else if (splitPath.length == 3) {
                     int id;
                     try {

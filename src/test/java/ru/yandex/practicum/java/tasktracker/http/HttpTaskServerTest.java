@@ -16,6 +16,8 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Map;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -169,6 +171,297 @@ class HttpTaskServerTest {
             int actualSizeTasksList = tasksFromServer.size();
 
             assertEquals(expectedSizeTasksList, actualSizeTasksList, "Неверное количество задач");
+        }
+
+        @Test
+        @DisplayName("Проверяем эндпоинт 'GET /tasks?from=1&size=1' - пагинация.")
+        void endpointTasks_Get_With_Pagination_Test() throws IOException, InterruptedException {
+            //Given
+            int expectedStatusCode = 200;
+            int expectedSize = 1;
+
+            Task task1 = new Task("task1", "test task1", StatusProgress.NEW, 10,
+                    LocalDateTime.now().withNano(0));
+            Task task2 = new Task("task2", "test task2", StatusProgress.NEW, 10,
+                    LocalDateTime.now().withNano(0).plusHours(1));
+            Task task3 = new Task("task3", "test task3", StatusProgress.NEW, 10,
+                    LocalDateTime.now().withNano(0).plusHours(2));
+            taskManager.addTask(task1);
+            taskManager.addTask(task2);
+            taskManager.addTask(task3);
+
+            HttpClient httpClient = HttpClient.newHttpClient();
+
+            // Полный список — чтобы взять эталон "второго элемента по порядку"
+            URI fullUrl = URI.create("http://localhost:8080/tasks");
+            HttpRequest fullRequest = HttpRequest.newBuilder()
+                    .uri(fullUrl)
+                    .GET()
+                    .build();
+            HttpResponse<String> fullResponse = httpClient.send(fullRequest,
+                    HttpResponse.BodyHandlers.ofString());
+
+            //When
+            URI url = URI.create("http://localhost:8080/tasks?from=1&size=1");
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(url)
+                    .GET()
+                    .build();
+            HttpResponse<String> response = httpClient.send(httpRequest,
+                    HttpResponse.BodyHandlers.ofString());
+
+            //Then
+            assertEquals(expectedStatusCode, response.statusCode());
+
+            TypeToken<ArrayList<Task>> collectionType = new TypeToken<>(){};
+            ArrayList<Task> fullList = gson.fromJson(fullResponse.body(), collectionType);
+            ArrayList<Task> pagedList = gson.fromJson(response.body(), collectionType);
+
+            assertEquals(expectedSize, pagedList.size(), "Неверный размер страницы");
+            assertEquals(fullList.get(1).getIdNumber(), pagedList.get(0).getIdNumber(),
+                    "Вернулась не вторая по порядку задача");
+        }
+
+        @Test
+        @DisplayName("Проверяем ответ сервера (400) - 'GET /tasks?from=-1', отрицательный from.")
+        void endpointTasks_Get_Negative_From_Test() throws IOException, InterruptedException {
+            //Given
+            int expectedStatusCode = 400;
+
+            HttpClient httpClient = HttpClient.newHttpClient();
+            URI url = URI.create("http://localhost:8080/tasks?from=-1");
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(url)
+                    .GET()
+                    .build();
+            //When
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            //Then
+            assertEquals(expectedStatusCode, response.statusCode());
+            TextForGson body = gson.fromJson(response.body(), TextForGson.class);
+            assertNotNull(body);
+            assertTrue(body.getDetail() != null && body.getDetail().contains("from"),
+                    "Сообщение об ошибке должно упоминать 'from'");
+        }
+
+        @Test
+        @DisplayName("Проверяем ответ сервера (400) - 'GET /tasks?size=0', нулевой size.")
+        void endpointTasks_Get_Zero_Size_Test() throws IOException, InterruptedException {
+            //Given
+            int expectedStatusCode = 400;
+
+            HttpClient httpClient = HttpClient.newHttpClient();
+            URI url = URI.create("http://localhost:8080/tasks?size=0");
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(url)
+                    .GET()
+                    .build();
+            //When
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            //Then
+            assertEquals(expectedStatusCode, response.statusCode());
+            TextForGson body = gson.fromJson(response.body(), TextForGson.class);
+            assertNotNull(body);
+            assertTrue(body.getDetail() != null && body.getDetail().contains("size"),
+                    "Сообщение об ошибке должно упоминать 'size'");
+        }
+
+        @Test
+        @DisplayName("Проверяем ответ сервера (400) - 'GET /tasks?size=101', превышение лимита size.")
+        void endpointTasks_Get_Oversized_Size_Test() throws IOException, InterruptedException {
+            //Given
+            int expectedStatusCode = 400;
+
+            HttpClient httpClient = HttpClient.newHttpClient();
+            URI url = URI.create("http://localhost:8080/tasks?size=101");
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(url)
+                    .GET()
+                    .build();
+            //When
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            //Then
+            assertEquals(expectedStatusCode, response.statusCode());
+            TextForGson body = gson.fromJson(response.body(), TextForGson.class);
+            assertNotNull(body);
+            assertTrue(body.getDetail() != null && body.getDetail().contains("size"),
+                    "Сообщение об ошибке должно упоминать 'size'");
+        }
+
+        @Test
+        @DisplayName("Проверяем ответ сервера (400) - 'GET /tasks?from=abc', нечисловой from.")
+        void endpointTasks_Get_NonInteger_From_Test() throws IOException, InterruptedException {
+            //Given
+            int expectedStatusCode = 400;
+
+            HttpClient httpClient = HttpClient.newHttpClient();
+            URI url = URI.create("http://localhost:8080/tasks?from=abc");
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(url)
+                    .GET()
+                    .build();
+            //When
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            //Then
+            assertEquals(expectedStatusCode, response.statusCode());
+            TextForGson body = gson.fromJson(response.body(), TextForGson.class);
+            assertNotNull(body);
+            assertTrue(body.getDetail() != null && body.getDetail().contains("from"),
+                    "Сообщение об ошибке должно упоминать 'from'");
+        }
+
+        @Test
+        @DisplayName("Проверяем ответ сервера (400) - 'GET /tasks?status=WRONG', невалидный status.")
+        void endpointTasks_Get_Invalid_Status_Test() throws IOException, InterruptedException {
+            //Given
+            int expectedStatusCode = 400;
+
+            HttpClient httpClient = HttpClient.newHttpClient();
+            URI url = URI.create("http://localhost:8080/tasks?status=WRONG");
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(url)
+                    .GET()
+                    .build();
+            //When
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            //Then
+            assertEquals(expectedStatusCode, response.statusCode());
+            TextForGson body = gson.fromJson(response.body(), TextForGson.class);
+            assertNotNull(body);
+            assertTrue(body.getDetail() != null && body.getDetail().contains("status"),
+                    "Сообщение об ошибке должно упоминать 'status'");
+        }
+
+        @Test
+        @DisplayName("Проверяем ответ сервера (400) - 'GET /tasks?sortBy=bad', невалидный sortBy.")
+        void endpointTasks_Get_Invalid_SortBy_Test() throws IOException, InterruptedException {
+            //Given
+            int expectedStatusCode = 400;
+
+            HttpClient httpClient = HttpClient.newHttpClient();
+            URI url = URI.create("http://localhost:8080/tasks?sortBy=bad");
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(url)
+                    .GET()
+                    .build();
+            //When
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            //Then
+            assertEquals(expectedStatusCode, response.statusCode());
+            TextForGson body = gson.fromJson(response.body(), TextForGson.class);
+            assertNotNull(body);
+            assertTrue(body.getDetail() != null && body.getDetail().contains("sortBy"),
+                    "Сообщение об ошибке должно упоминать 'sortBy'");
+        }
+
+        @Test
+        @DisplayName("Проверяем эндпоинт 'GET /tasks?status=DONE' - фильтр по статусу.")
+        void endpointTasks_Get_Filtered_By_Status_Test() throws IOException, InterruptedException {
+            //Given
+            int expectedStatusCode = 200;
+            int expectedSize = 2;
+
+            Task newTask = new Task("new", "new task", StatusProgress.NEW, 10,
+                    LocalDateTime.now().withNano(0));
+            Task doneTask1 = new Task("done1", "done task 1", StatusProgress.NEW, 10,
+                    LocalDateTime.now().withNano(0).plusHours(1));
+            doneTask1.setStatusProgress(StatusProgress.DONE);
+            Task doneTask2 = new Task("done2", "done task 2", StatusProgress.NEW, 10,
+                    LocalDateTime.now().withNano(0).plusHours(2));
+            doneTask2.setStatusProgress(StatusProgress.DONE);
+            taskManager.addTask(newTask);
+            taskManager.addTask(doneTask1);
+            taskManager.addTask(doneTask2);
+
+            HttpClient httpClient = HttpClient.newHttpClient();
+            URI url = URI.create("http://localhost:8080/tasks?status=DONE");
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(url)
+                    .GET()
+                    .build();
+            //When
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            //Then
+            assertEquals(expectedStatusCode, response.statusCode());
+
+            TypeToken<ArrayList<Task>> collectionType = new TypeToken<>(){};
+            ArrayList<Task> result = gson.fromJson(response.body(), collectionType);
+
+            assertEquals(expectedSize, result.size(), "Неверное количество задач после фильтра");
+            assertTrue(result.stream().allMatch(t -> t.getStatusProgress() == StatusProgress.DONE),
+                    "В результате есть задача не со статусом DONE");
+        }
+
+        @Test
+        @DisplayName("Проверяем эндпоинт 'GET /tasks?sortBy=startDateTime' - сортировка по дате старта.")
+        void endpointTasks_Get_Sorted_By_StartDateTime_Test() throws IOException, InterruptedException {
+            //Given
+            int expectedStatusCode = 200;
+            int expectedSize = 3;
+            LocalDateTime base = LocalDateTime.of(2026, 1, 1, 10, 0);
+
+            // Добавляем в "неправильном" порядке: средняя, поздняя, ранняя
+            Task middle = new Task("middle", "middle", StatusProgress.NEW, 10, base.plusHours(5));
+            Task late = new Task("late", "late", StatusProgress.NEW, 10, base.plusHours(10));
+            Task early = new Task("early", "early", StatusProgress.NEW, 10, base.plusHours(1));
+            taskManager.addTask(middle);
+            taskManager.addTask(late);
+            taskManager.addTask(early);
+
+            HttpClient httpClient = HttpClient.newHttpClient();
+            URI url = URI.create("http://localhost:8080/tasks?sortBy=startDateTime");
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(url)
+                    .GET()
+                    .build();
+            //When
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            //Then
+            assertEquals(expectedStatusCode, response.statusCode());
+
+            TypeToken<ArrayList<Task>> collectionType = new TypeToken<>(){};
+            ArrayList<Task> result = gson.fromJson(response.body(), collectionType);
+
+            assertEquals(expectedSize, result.size(), "Неверное количество задач");
+            assertEquals(early.getIdNumber(), result.get(0).getIdNumber(),
+                    "Первой должна быть задача с самым ранним startDateTime");
+            assertEquals(middle.getIdNumber(), result.get(1).getIdNumber(),
+                    "Второй должна быть задача со средним startDateTime");
+            assertEquals(late.getIdNumber(), result.get(2).getIdNumber(),
+                    "Третьей должна быть задача с самым поздним startDateTime");
+        }
+
+        @Test
+        @DisplayName("Проверяем эндпоинт 'GET /tasks' без параметров - дефолт size=20.")
+        void endpointTasks_Get_Default_Params_Test() throws IOException, InterruptedException {
+            //Given
+            int expectedStatusCode = 200;
+            int totalTasks = 25;
+            int expectedSize = 20;
+            LocalDateTime base = LocalDateTime.of(2026, 1, 1, 10, 0);
+
+            for (int i = 0; i < totalTasks; i++) {
+                Task task = new Task("task-" + i, "desc", StatusProgress.NEW, 10,
+                        base.plusMinutes(i * 20L));
+                taskManager.addTask(task);
+            }
+
+            HttpClient httpClient = HttpClient.newHttpClient();
+            URI url = URI.create("http://localhost:8080/tasks");
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(url)
+                    .GET()
+                    .build();
+            //When
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            //Then
+            assertEquals(expectedStatusCode, response.statusCode());
+
+            TypeToken<ArrayList<Task>> collectionType = new TypeToken<>(){};
+            ArrayList<Task> result = gson.fromJson(response.body(), collectionType);
+
+            assertEquals(expectedSize, result.size(),
+                    "По умолчанию должно вернуться 20 задач (size=20)");
         }
 
         @Test
@@ -453,6 +746,56 @@ class HttpTaskServerTest {
         }
 
         @Test
+        @DisplayName("Проверяем эндпоинт 'GET /subtasks?from=1&size=1' - пагинация.")
+        void endpointSubtasks_Get_With_Pagination_Test() throws IOException, InterruptedException {
+            //Given
+            int expectedStatusCode = 200;
+            int expectedSize = 1;
+
+            Epic epic = new Epic("epic", "epic");
+            taskManager.addEpic(epic);
+            Subtask subtask1 = new Subtask("subtask1", "test subtask1", StatusProgress.NEW,
+                    epic.getIdNumber(), 10, LocalDateTime.now().withNano(0));
+            Subtask subtask2 = new Subtask("subtask2", "test subtask2", StatusProgress.NEW,
+                    epic.getIdNumber(), 10, LocalDateTime.now().withNano(0).plusHours(1));
+            Subtask subtask3 = new Subtask("subtask3", "test subtask3", StatusProgress.NEW,
+                    epic.getIdNumber(), 10, LocalDateTime.now().withNano(0).plusHours(2));
+            taskManager.addSubtask(subtask1);
+            taskManager.addSubtask(subtask2);
+            taskManager.addSubtask(subtask3);
+
+            HttpClient httpClient = HttpClient.newHttpClient();
+
+            URI fullUrl = URI.create("http://localhost:8080/subtasks");
+            HttpRequest fullRequest = HttpRequest.newBuilder()
+                    .uri(fullUrl)
+                    .GET()
+                    .build();
+            HttpResponse<String> fullResponse = httpClient.send(fullRequest,
+                    HttpResponse.BodyHandlers.ofString());
+
+            //When
+            URI url = URI.create("http://localhost:8080/subtasks?from=1&size=1");
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(url)
+                    .GET()
+                    .build();
+            HttpResponse<String> response = httpClient.send(httpRequest,
+                    HttpResponse.BodyHandlers.ofString());
+
+            //Then
+            assertEquals(expectedStatusCode, response.statusCode());
+
+            TypeToken<ArrayList<Subtask>> collectionType = new TypeToken<>(){};
+            ArrayList<Subtask> fullList = gson.fromJson(fullResponse.body(), collectionType);
+            ArrayList<Subtask> pagedList = gson.fromJson(response.body(), collectionType);
+
+            assertEquals(expectedSize, pagedList.size(), "Неверный размер страницы");
+            assertEquals(fullList.get(1).getIdNumber(), pagedList.get(0).getIdNumber(),
+                    "Вернулась не вторая по порядку подзадача");
+        }
+
+        @Test
         @DisplayName("Проверяем эндпоинт 'GET /subtasks/{id}' - получение конкретной Subtask.")
         void endpointSubtasks_Get_That_Subtask_Test() throws IOException, InterruptedException {
             //Given
@@ -691,6 +1034,51 @@ class HttpTaskServerTest {
             int actualSizeEpicsList = epicsFromServer.size();
 
             assertEquals(expectedSizeEpicsList, actualSizeEpicsList, "Неверное количество задач");
+        }
+
+        @Test
+        @DisplayName("Проверяем эндпоинт 'GET /epics?from=1&size=1' - пагинация.")
+        void endpointEpics_Get_With_Pagination_Test() throws IOException, InterruptedException {
+            //Given
+            int expectedStatusCode = 200;
+            int expectedSize = 1;
+
+            Epic epic1 = new Epic("epic1", "epic1");
+            Epic epic2 = new Epic("epic2", "epic2");
+            Epic epic3 = new Epic("epic3", "epic3");
+            taskManager.addEpic(epic1);
+            taskManager.addEpic(epic2);
+            taskManager.addEpic(epic3);
+
+            HttpClient httpClient = HttpClient.newHttpClient();
+
+            URI fullUrl = URI.create("http://localhost:8080/epics");
+            HttpRequest fullRequest = HttpRequest.newBuilder()
+                    .uri(fullUrl)
+                    .GET()
+                    .build();
+            HttpResponse<String> fullResponse = httpClient.send(fullRequest,
+                    HttpResponse.BodyHandlers.ofString());
+
+            //When
+            URI url = URI.create("http://localhost:8080/epics?from=1&size=1");
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(url)
+                    .GET()
+                    .build();
+            HttpResponse<String> response = httpClient.send(httpRequest,
+                    HttpResponse.BodyHandlers.ofString());
+
+            //Then
+            assertEquals(expectedStatusCode, response.statusCode());
+
+            TypeToken<ArrayList<Epic>> collectionType = new TypeToken<>(){};
+            ArrayList<Epic> fullList = gson.fromJson(fullResponse.body(), collectionType);
+            ArrayList<Epic> pagedList = gson.fromJson(response.body(), collectionType);
+
+            assertEquals(expectedSize, pagedList.size(), "Неверный размер страницы");
+            assertEquals(fullList.get(1).getIdNumber(), pagedList.get(0).getIdNumber(),
+                    "Вернулся не второй по порядку эпик");
         }
 
         @Test
@@ -1045,6 +1433,99 @@ class HttpTaskServerTest {
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
             System.out.println(gson.fromJson(response.body(), TextForGson.class));
+            assertEquals(expectedStatusCode, response.statusCode());
+        }
+    }
+
+    @Nested
+    @DisplayName("Тесты работы эндпоинтов /health.")
+    class testForHealth {
+        @Test
+        @DisplayName("Проверяем эндпоинт 'GET /health' - возвращает статус UP.")
+        void endpointHealth_Get_Test() throws IOException, InterruptedException {
+            //Given
+            int expectedStatusCode = 200;
+
+            HttpClient httpClient = HttpClient.newHttpClient();
+            URI url = URI.create("http://localhost:8080/health");
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(url)
+                    .GET()
+                    .build();
+            //When
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            //Then
+            assertEquals(expectedStatusCode, response.statusCode());
+
+            TypeToken<Map<String, String>> mapType = new TypeToken<>(){};
+            Map<String, String> body = gson.fromJson(response.body(), mapType);
+
+            assertNotNull(body);
+            assertEquals("UP", body.get("status"));
+        }
+
+        @Test
+        @DisplayName("Проверяем ответ сервера (405) - эндпоинт '/health', но с методом 'DELETE'.")
+        void endpointHealth_But_Delete_Test() throws IOException, InterruptedException {
+            //Given
+            int expectedStatusCode = 405;
+
+            HttpClient httpClient = HttpClient.newHttpClient();
+            URI url = URI.create("http://localhost:8080/health");
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(url)
+                    .DELETE()
+                    .build();
+            //When
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            //Then
+            assertEquals(expectedStatusCode, response.statusCode());
+        }
+    }
+
+    @Nested
+    @DisplayName("Тесты работы эндпоинтов /version.")
+    class testForVersion {
+        @Test
+        @DisplayName("Проверяем эндпоинт 'GET /version' - возвращает версию.")
+        void endpointVersion_Get_Test() throws IOException, InterruptedException {
+            //Given
+            int expectedStatusCode = 200;
+            String expectedVersion = "0.2.0";
+
+            HttpClient httpClient = HttpClient.newHttpClient();
+            URI url = URI.create("http://localhost:8080/version");
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(url)
+                    .GET()
+                    .build();
+            //When
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            //Then
+            assertEquals(expectedStatusCode, response.statusCode());
+
+            TypeToken<Map<String, String>> mapType = new TypeToken<>(){};
+            Map<String, String> body = gson.fromJson(response.body(), mapType);
+
+            assertNotNull(body);
+            assertEquals(expectedVersion, body.get("version"));
+        }
+
+        @Test
+        @DisplayName("Проверяем ответ сервера (405) - эндпоинт '/version', но с методом 'DELETE'.")
+        void endpointVersion_But_Delete_Test() throws IOException, InterruptedException {
+            //Given
+            int expectedStatusCode = 405;
+
+            HttpClient httpClient = HttpClient.newHttpClient();
+            URI url = URI.create("http://localhost:8080/version");
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(url)
+                    .DELETE()
+                    .build();
+            //When
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            //Then
             assertEquals(expectedStatusCode, response.statusCode());
         }
     }
