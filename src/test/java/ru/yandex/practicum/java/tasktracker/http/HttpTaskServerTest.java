@@ -25,30 +25,33 @@ import com.google.gson.reflect.TypeToken;
 @DisplayName("Тесты для HttpTaskServer")
 class HttpTaskServerTest {
 
-    TaskManager taskManager;
-    HttpTaskServer httpTaskServer;
-    Gson gson;
+    static TaskManager taskManager;
+    static HttpTaskServer httpTaskServer;
+    static Gson gson;
+    static String baseUrl;
 
-    public HttpTaskServerTest() throws IOException {
+    @BeforeAll
+    public static void startServer() throws IOException {
         taskManager = new TaskManager();
-        httpTaskServer = new HttpTaskServer(taskManager);
+        httpTaskServer = new HttpTaskServer(taskManager, 0);
         gson = new GsonBuilder()
                 .registerTypeAdapter(LocalDateTime.class, new LocalDateTimeTypeAdapter())
                 .registerTypeAdapter(Duration.class, new DurationTypeAdapter())
                 .registerTypeAdapter(AbstractTask.class, new AbstractTaskDeserializer())
                 .create();
+        httpTaskServer.start();
+        baseUrl = "http://localhost:" + httpTaskServer.getPort();
+    }
+
+    @AfterAll
+    public static void stopServer() {
+        httpTaskServer.stop();
     }
 
     @BeforeEach
-    public void Prepare_For_Test() {
+    public void cleanData() {
         taskManager.removeAllTasks();
         taskManager.removeAllEpics();
-        httpTaskServer.start();
-    }
-
-    @AfterEach
-    public void serverStop() {
-        httpTaskServer.stop();
     }
 
     @Nested
@@ -65,7 +68,7 @@ class HttpTaskServerTest {
             taskManager.addTask(task);
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/tasks/" + task.getIdNumber());
+            URI url = URI.create(baseUrl + "/tasks/" + task.getIdNumber());
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .DELETE()
@@ -89,7 +92,7 @@ class HttpTaskServerTest {
             String taskJson = gson.toJson(task);
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/tasks");
+            URI url = URI.create(baseUrl + "/tasks");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .header("Content-type", "application/json")
                     .uri(url)
@@ -98,7 +101,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
 
             ArrayList<Task> tasksFromManager = taskManager.getAllTasks();
@@ -123,7 +125,7 @@ class HttpTaskServerTest {
             String taskJson = gson.toJson(task);
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/tasks");
+            URI url = URI.create(baseUrl + "/tasks");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .header("Content-type", "application/json")
                     .uri(url)
@@ -132,7 +134,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
 
             Task tasksFromManager = taskManager.getTaskByIdNumber(task.getIdNumber());
@@ -156,7 +157,7 @@ class HttpTaskServerTest {
             taskManager.addTask(task2);
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/tasks");
+            URI url = URI.create(baseUrl + "/tasks");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -193,7 +194,7 @@ class HttpTaskServerTest {
             HttpClient httpClient = HttpClient.newHttpClient();
 
             // Полный список — чтобы взять эталон "второго элемента по порядку"
-            URI fullUrl = URI.create("http://localhost:8080/tasks");
+            URI fullUrl = URI.create(baseUrl + "/tasks");
             HttpRequest fullRequest = HttpRequest.newBuilder()
                     .uri(fullUrl)
                     .GET()
@@ -202,7 +203,7 @@ class HttpTaskServerTest {
                     HttpResponse.BodyHandlers.ofString());
 
             //When
-            URI url = URI.create("http://localhost:8080/tasks?from=1&size=1");
+            URI url = URI.create(baseUrl + "/tasks?from=1&size=1");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -229,7 +230,7 @@ class HttpTaskServerTest {
             int expectedStatusCode = 400;
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/tasks?from=-1");
+            URI url = URI.create(baseUrl + "/tasks?from=-1");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -251,7 +252,7 @@ class HttpTaskServerTest {
             int expectedStatusCode = 400;
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/tasks?size=0");
+            URI url = URI.create(baseUrl + "/tasks?size=0");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -273,7 +274,7 @@ class HttpTaskServerTest {
             int expectedStatusCode = 400;
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/tasks?size=101");
+            URI url = URI.create(baseUrl + "/tasks?size=101");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -295,7 +296,7 @@ class HttpTaskServerTest {
             int expectedStatusCode = 400;
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/tasks?from=abc");
+            URI url = URI.create(baseUrl + "/tasks?from=abc");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -317,7 +318,7 @@ class HttpTaskServerTest {
             int expectedStatusCode = 400;
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/tasks?status=WRONG");
+            URI url = URI.create(baseUrl + "/tasks?status=WRONG");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -339,7 +340,7 @@ class HttpTaskServerTest {
             int expectedStatusCode = 400;
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/tasks?sortBy=bad");
+            URI url = URI.create(baseUrl + "/tasks?sortBy=bad");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -374,7 +375,7 @@ class HttpTaskServerTest {
             taskManager.addTask(doneTask2);
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/tasks?status=DONE");
+            URI url = URI.create(baseUrl + "/tasks?status=DONE");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -409,7 +410,7 @@ class HttpTaskServerTest {
             taskManager.addTask(early);
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/tasks?sortBy=startDateTime");
+            URI url = URI.create(baseUrl + "/tasks?sortBy=startDateTime");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -447,7 +448,7 @@ class HttpTaskServerTest {
             }
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/tasks");
+            URI url = URI.create(baseUrl + "/tasks");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -480,7 +481,7 @@ class HttpTaskServerTest {
             Task expectedTask = task2;
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/tasks/" + task2.getIdNumber());
+            URI url = URI.create(baseUrl + "/tasks/" + task2.getIdNumber());
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -503,7 +504,7 @@ class HttpTaskServerTest {
             int expectedStatusCode = 404;
             int idNotExistsTask = 666;
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/tasks/" + idNotExistsTask);
+            URI url = URI.create(baseUrl + "/tasks/" + idNotExistsTask);
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .DELETE()
@@ -511,7 +512,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
         }
 
@@ -530,7 +530,7 @@ class HttpTaskServerTest {
             String task409Json = gson.toJson(task409);
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/tasks");
+            URI url = URI.create(baseUrl + "/tasks");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .header("Content-type", "application/json")
                     .uri(url)
@@ -539,7 +539,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
         }
 
@@ -549,13 +548,11 @@ class HttpTaskServerTest {
             //Given
             int expectedStatusCode = 400;
 
-            Task task400 = new Task("task400", "task400 test", StatusProgress.NEW, 10,
-                    LocalDateTime.now().withNano(0));
-            String task400Json = gson.toJson(task400);
-            String task400JsonIncorrect = task400Json.replace("NEW", "something");
+            String task400JsonIncorrect = "{\"name\":\"task400\",\"description\":\"task400 test\","
+                    + "\"statusProgress\":\"something\",\"durationInMinutes\":10,\"startDateTime\":\"EMPTY\"}";
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/tasks");
+            URI url = URI.create(baseUrl + "/tasks");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .header("Content-type", "application/json")
                     .uri(url)
@@ -564,7 +561,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
         }
 
@@ -576,7 +572,7 @@ class HttpTaskServerTest {
             int expectedSize = 0;
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/tasks");
+            URI url = URI.create(baseUrl + "/tasks");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -598,7 +594,7 @@ class HttpTaskServerTest {
             int expectedStatusCode = 404;
             int idNotExistsTask = 666;
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/tasks/" + idNotExistsTask);
+            URI url = URI.create(baseUrl + "/tasks/" + idNotExistsTask);
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -606,7 +602,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
         }
     }
@@ -627,7 +622,7 @@ class HttpTaskServerTest {
             taskManager.addSubtask(subtask);
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/subtasks/" + subtask.getIdNumber());
+            URI url = URI.create(baseUrl + "/subtasks/" + subtask.getIdNumber());
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .DELETE()
@@ -635,7 +630,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
             assertThrows(RuntimeException.class, () -> taskManager.getSubtaskByIdNumber(subtask.getIdNumber()));
         }
@@ -656,7 +650,7 @@ class HttpTaskServerTest {
             String subtaskJson = gson.toJson(subtask);
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/subtasks");
+            URI url = URI.create(baseUrl + "/subtasks");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .header("Content-type", "application/json")
                     .uri(url)
@@ -665,7 +659,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
 
             ArrayList<Subtask> subtasksFromManager = taskManager.getAllSubtasks();
@@ -693,7 +686,7 @@ class HttpTaskServerTest {
             String subtaskJson = gson.toJson(subtask);
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/subtasks");
+            URI url = URI.create(baseUrl + "/subtasks");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .header("Content-type", "application/json")
                     .uri(url)
@@ -702,7 +695,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
 
             Subtask subtasksFromManager = taskManager.getSubtaskByIdNumber(subtask.getIdNumber());
@@ -728,7 +720,7 @@ class HttpTaskServerTest {
             taskManager.addSubtask(subtask2);
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/subtasks");
+            URI url = URI.create(baseUrl + "/subtasks");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -766,7 +758,7 @@ class HttpTaskServerTest {
 
             HttpClient httpClient = HttpClient.newHttpClient();
 
-            URI fullUrl = URI.create("http://localhost:8080/subtasks");
+            URI fullUrl = URI.create(baseUrl + "/subtasks");
             HttpRequest fullRequest = HttpRequest.newBuilder()
                     .uri(fullUrl)
                     .GET()
@@ -775,7 +767,7 @@ class HttpTaskServerTest {
                     HttpResponse.BodyHandlers.ofString());
 
             //When
-            URI url = URI.create("http://localhost:8080/subtasks?from=1&size=1");
+            URI url = URI.create(baseUrl + "/subtasks?from=1&size=1");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -813,7 +805,7 @@ class HttpTaskServerTest {
             Subtask expectedSubtask = subtask2;
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/subtasks/" + subtask2.getIdNumber());
+            URI url = URI.create(baseUrl + "/subtasks/" + subtask2.getIdNumber());
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -836,7 +828,7 @@ class HttpTaskServerTest {
             int expectedStatusCode = 404;
             int idNotExistsSubtask = 666;
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/subtasks/" + idNotExistsSubtask);
+            URI url = URI.create(baseUrl + "/subtasks/" + idNotExistsSubtask);
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .DELETE()
@@ -844,7 +836,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
         }
 
@@ -865,7 +856,7 @@ class HttpTaskServerTest {
             String subtask409Json = gson.toJson(subtask409);
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/subtasks");
+            URI url = URI.create(baseUrl + "/subtasks");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .header("Content-type", "application/json")
                     .uri(url)
@@ -874,7 +865,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
         }
 
@@ -886,13 +876,12 @@ class HttpTaskServerTest {
 
             Epic epic = new Epic("epic", "epic");
             taskManager.addEpic(epic);
-            Subtask subtask400 = new Subtask("subtask400", "test subtask400", StatusProgress.NEW,
-                    epic.getIdNumber(),10, LocalDateTime.now().withNano(0));
-            String subtask400Json = gson.toJson(subtask400);
-            String subtask400JsonIncorrect = subtask400Json.replace("10", "ten");
+            String subtask400JsonIncorrect = "{\"name\":\"subtask400\",\"description\":\"test subtask400\","
+                    + "\"statusProgress\":\"NEW\",\"parentEpicIdNumber\":" + epic.getIdNumber() + ","
+                    + "\"durationInMinutes\":\"ten\",\"startDateTime\":\"EMPTY\"}";
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/subtasks");
+            URI url = URI.create(baseUrl + "/subtasks");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .header("Content-type", "application/json")
                     .uri(url)
@@ -901,7 +890,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
         }
 
@@ -913,7 +901,7 @@ class HttpTaskServerTest {
             int expectedSize = 0;
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/subtasks");
+            URI url = URI.create(baseUrl + "/subtasks");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -935,7 +923,7 @@ class HttpTaskServerTest {
             int expectedStatusCode = 404;
             int idNotExistsSubtask = 666;
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/subtasks/" + idNotExistsSubtask);
+            URI url = URI.create(baseUrl + "/subtasks/" + idNotExistsSubtask);
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -943,7 +931,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
         }
     }
@@ -961,7 +948,7 @@ class HttpTaskServerTest {
             taskManager.addEpic(epic);
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/epics/" + epic.getIdNumber());
+            URI url = URI.create(baseUrl + "/epics/" + epic.getIdNumber());
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .DELETE()
@@ -986,7 +973,7 @@ class HttpTaskServerTest {
             String epicJson = gson.toJson(epic);
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/epics");
+            URI url = URI.create(baseUrl + "/epics");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .header("Content-type", "application/json")
                     .uri(url)
@@ -995,7 +982,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
 
             ArrayList<Epic> epicsFromManager = taskManager.getAllEpics();
@@ -1019,7 +1005,7 @@ class HttpTaskServerTest {
             taskManager.addEpic(epic2);
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/epics");
+            URI url = URI.create(baseUrl + "/epics");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -1052,7 +1038,7 @@ class HttpTaskServerTest {
 
             HttpClient httpClient = HttpClient.newHttpClient();
 
-            URI fullUrl = URI.create("http://localhost:8080/epics");
+            URI fullUrl = URI.create(baseUrl + "/epics");
             HttpRequest fullRequest = HttpRequest.newBuilder()
                     .uri(fullUrl)
                     .GET()
@@ -1061,7 +1047,7 @@ class HttpTaskServerTest {
                     HttpResponse.BodyHandlers.ofString());
 
             //When
-            URI url = URI.create("http://localhost:8080/epics?from=1&size=1");
+            URI url = URI.create(baseUrl + "/epics?from=1&size=1");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -1093,7 +1079,7 @@ class HttpTaskServerTest {
             Epic expectedEpic = epic;
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/epics/" + epic.getIdNumber());
+            URI url = URI.create(baseUrl + "/epics/" + epic.getIdNumber());
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -1125,7 +1111,7 @@ class HttpTaskServerTest {
             taskManager.addSubtask(subtask2);
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/epics/" + epic.getIdNumber() + "/subtasks");
+            URI url = URI.create(baseUrl + "/epics/" + epic.getIdNumber() + "/subtasks");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -1150,7 +1136,7 @@ class HttpTaskServerTest {
             int expectedStatusCode = 404;
             int idNotExistsEpic = 666;
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/epics/" + idNotExistsEpic);
+            URI url = URI.create(baseUrl + "/epics/" + idNotExistsEpic);
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .DELETE()
@@ -1158,7 +1144,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
         }
 
@@ -1175,7 +1160,7 @@ class HttpTaskServerTest {
             String epicJson = gson.toJson(epic);
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/epics");
+            URI url = URI.create(baseUrl + "/epics");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .header("Content-type", "application/json")
                     .uri(url)
@@ -1184,7 +1169,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
         }
 
@@ -1194,13 +1178,11 @@ class HttpTaskServerTest {
             //Given
             int expectedStatusCode = 400;
 
-            Epic epic400 = new Epic("epic", "epic");
-
-            String epic400Json = gson.toJson(epic400);
-            String epic400JsonIncorrect = epic400Json.replace("NEW", "OLD");
+            String epic400JsonIncorrect = "{\"name\":\"epic\",\"description\":\"epic\","
+                    + "\"statusProgress\":\"OLD\"}";
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/epics");
+            URI url = URI.create(baseUrl + "/epics");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .header("Content-type", "application/json")
                     .uri(url)
@@ -1209,7 +1191,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
         }
 
@@ -1221,7 +1202,7 @@ class HttpTaskServerTest {
             int expectedSize = 0;
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/epics");
+            URI url = URI.create(baseUrl + "/epics");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -1243,7 +1224,7 @@ class HttpTaskServerTest {
             int expectedStatusCode = 404;
             int idNotExistsEpic = 666;
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/epics/" + idNotExistsEpic);
+            URI url = URI.create(baseUrl + "/epics/" + idNotExistsEpic);
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -1251,7 +1232,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
         }
     }
@@ -1280,7 +1260,7 @@ class HttpTaskServerTest {
             taskManager.getSubtaskByIdNumber(subtask.getIdNumber());
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/history");
+            URI url = URI.create(baseUrl + "/history");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -1293,8 +1273,6 @@ class HttpTaskServerTest {
             TypeToken<ArrayList<AbstractTask>> collectionType = new TypeToken<>(){};
             ArrayList<AbstractTask> historyFromServer = gson.fromJson(response.body(), collectionType);
             int actualSizeHistory = historyFromServer.size();
-            System.out.println(historyFromServer);
-
             assertEquals(expectedSizeHistory, actualSizeHistory, "Неверное количество задач");
         }
 
@@ -1306,7 +1284,7 @@ class HttpTaskServerTest {
             int expectedSizeHistory = 0;
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/history");
+            URI url = URI.create(baseUrl + "/history");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -1319,8 +1297,6 @@ class HttpTaskServerTest {
             TypeToken<ArrayList<AbstractTask>> collectionType = new TypeToken<>(){};
             ArrayList<AbstractTask> historyFromServer = gson.fromJson(response.body(), collectionType);
             int actualSizeHistory = historyFromServer.size();
-            System.out.println(historyFromServer);
-
             assertEquals(expectedSizeHistory, actualSizeHistory, "Неверное количество задач");
         }
 
@@ -1332,7 +1308,7 @@ class HttpTaskServerTest {
             int expectedStatusCode = 405;
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/history");
+            URI url = URI.create(baseUrl + "/history");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .DELETE()
@@ -1340,7 +1316,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
         }
     }
@@ -1372,7 +1347,7 @@ class HttpTaskServerTest {
             taskManager.addTask(task2);
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/prioritized");
+            URI url = URI.create(baseUrl + "/prioritized");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -1385,8 +1360,6 @@ class HttpTaskServerTest {
             TypeToken<ArrayList<AbstractTask>> collectionType = new TypeToken<>(){};
             ArrayList<AbstractTask> prioritizedFromServer = gson.fromJson(response.body(), collectionType);
             int actualSizePrioritized = prioritizedFromServer.size();
-            System.out.println(prioritizedFromServer);
-
             assertEquals(expectedSizePrioritized, actualSizePrioritized, "Неверное количество задач");
         }
 
@@ -1398,7 +1371,7 @@ class HttpTaskServerTest {
             int expectedSizePrioritized = 0;
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/prioritized");
+            URI url = URI.create(baseUrl + "/prioritized");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -1411,8 +1384,6 @@ class HttpTaskServerTest {
             TypeToken<ArrayList<AbstractTask>> collectionType = new TypeToken<>(){};
             ArrayList<AbstractTask> prioritizedFromServer = gson.fromJson(response.body(), collectionType);
             int actualSizePrioritized = prioritizedFromServer.size();
-            System.out.println(prioritizedFromServer);
-
             assertEquals(expectedSizePrioritized, actualSizePrioritized, "Неверное количество задач");
         }
 
@@ -1424,7 +1395,7 @@ class HttpTaskServerTest {
             int expectedStatusCode = 405;
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/prioritized");
+            URI url = URI.create(baseUrl + "/prioritized");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .DELETE()
@@ -1432,7 +1403,6 @@ class HttpTaskServerTest {
             //When
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
             //Then
-            System.out.println(gson.fromJson(response.body(), TextForGson.class));
             assertEquals(expectedStatusCode, response.statusCode());
         }
     }
@@ -1447,7 +1417,7 @@ class HttpTaskServerTest {
             int expectedStatusCode = 200;
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/health");
+            URI url = URI.create(baseUrl + "/health");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -1471,7 +1441,7 @@ class HttpTaskServerTest {
             int expectedStatusCode = 405;
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/health");
+            URI url = URI.create(baseUrl + "/health");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .DELETE()
@@ -1494,7 +1464,7 @@ class HttpTaskServerTest {
             String expectedVersion = "0.2.0";
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/version");
+            URI url = URI.create(baseUrl + "/version");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .GET()
@@ -1518,7 +1488,7 @@ class HttpTaskServerTest {
             int expectedStatusCode = 405;
 
             HttpClient httpClient = HttpClient.newHttpClient();
-            URI url = URI.create("http://localhost:8080/version");
+            URI url = URI.create(baseUrl + "/version");
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(url)
                     .DELETE()

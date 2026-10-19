@@ -6,7 +6,7 @@ Backend-сервис для управления задачами по мето�
 учебного Яндекс Практикума, в процессе доработки.
 
 Репозиторий: https://github.com/vd89zen/java-kanban
-Активная ветка: `develop-stage-6-api` (этапы 0-1-2-3-4-5-6 закрыты, этап 7 следующий).
+Активная ветка: `develop-stage-7-tests` (этапы 0-1-2-3-4-5-6-7 закрыты, этап 8 следующий).
 
 **Стек:** Java 17+, `com.sun.net.httpserver.HttpServer`, Gson, Maven, JUnit 5,
 SLF4J + Logback.
@@ -35,7 +35,7 @@ SLF4J + Logback.
 - `maven.compiler.release` — 17 (НЕ `source`/`target`)
 
 **Зависимости:** gson 2.11.0, slf4j-api 2.0.13, logback-classic 1.5.6,
-junit-jupiter 5.10.2 (test).
+junit-jupiter 5.10.2 (test, включая `junit-jupiter-params` для параметризованных тестов).
 
 **Плагины:** maven-compiler 3.13.0, maven-surefire 3.2.5 (argLine с UTF-8),
 maven-shade 3.5.3 (Services + Manifest transformers), exec-maven-plugin 3.2.0.
@@ -70,6 +70,7 @@ TaskTrackerApplication
 - Менеджер держит состояние в concurrent-коллекциях, все мутации — под единым локом.
 - Генерация id — монотонный счётчик `nextId`, без переиспользования удалённых id.
 - Пагинация, фильтры, сортировка — на уровне хендлеров, не в сервисе.
+- `HttpTaskServer` принимает явный порт (нужно для тестов на порту 0).
 
 Пакеты:
 
@@ -126,12 +127,19 @@ TaskTrackerApplication
 │   └── test/java/ru/yandex/practicum/java/tasktracker/
 │       ├── http/HttpTaskServerTest.java
 │       ├── manage/ManagersUtilTest.java
-│       ├── manage/LinkedHashMapCustomTest.java
 │       ├── service/
 │       │   ├── TaskManagerTest.java
 │       │   ├── TaskViewHistoryTest.java
 │       │   └── TaskManagerConcurrencyTest.java
-│       └── task/...  (EpicTest, SubtaskTest, TaskTest)
+│       ├── storage/CsvStorageTest.java
+│       ├── task/
+│       │   ├── TaskTest.java
+│       │   ├── SubtaskTest.java
+│       │   └── EpicTest.java
+│       └── utils/
+│           ├── LinkedHashMapCustomTest.java
+│           ├── CommaSeparatedValuesCreateProcessTest.java
+│           └── gson/GsonAdaptersTest.java
 ```
 
 ## Ключевые сигнатуры
@@ -164,7 +172,6 @@ TaskManager(TaskStorage storage)   // storage != null
 
 **Потокобезопасность:** все мутации — под `synchronized (lock)`, `persist()`
 вне лока. Порядок захвата: `lock` → монитор `TaskViewHistory`. Deadlock исключён.
-Javadoc на классе описывает атомарность и персистенцию.
 
 ### `service.TaskViewHistory`
 
@@ -208,11 +215,8 @@ static TaskManager getFileBacked(File)
 ```
 static int getServerPort()      // env SERVER_PORT / -Dserver.port / 8080
 static String getDataFilePath() // env DATA_FILE / -Ddata.file / "tasks.csv"
-static String getVersion()      // "0.2.0"
+static String getVersion()      // "0.2.0" (хардкод, синхронизация с pom — в этапе 8)
 ```
-
-Версия — хардкод, в этапе 8 (инфраструктура) при подключении Maven resource
-filtering будет читаться из `pom.xml`.
 
 ### `LinkedHashMapCustom`
 
@@ -245,10 +249,12 @@ Default-конструктор: `idNumber = -1`, `durationInMinutes = Duration.Z
 ### `HttpTaskServer`
 
 ```
-HttpTaskServer() throws IOException
-HttpTaskServer(TaskManager) throws IOException
-void start()   // log.info("HTTP server started on port {}", port)
-void stop()    // httpServer.stop(1); executor.shutdownNow() + awaitTermination(1s)
+HttpTaskServer() throws IOException                        // port из AppConfig
+HttpTaskServer(TaskManager) throws IOException             // port из AppConfig
+HttpTaskServer(TaskManager, int port) throws IOException   // явный порт (0 — свободный от ОС)
+void start()
+void stop()          // stop(1) + executor.shutdownNow() + awaitTermination(1s)
+int getPort()        // фактический порт (после создания HttpServer)
 ```
 
 `THREAD_POOL_SIZE = 8`, `SHUTDOWN_TIMEOUT_SECONDS = 1`.
@@ -278,7 +284,7 @@ protected Comparator<AbstractTask> comparatorFor(String sortBy)
 `parseQueryParams` бросает `BadRequestException` (→ 400) при невалидных
 параметрах. Неизвестные параметры игнорируются. Не тримим — строгий контракт.
 `comparatorFor`: `"id"` → по `getIdNumber()`, `"startDateTime"` → по
-`getStartDateTime().orElse(LocalDateTime.MAX)` (задачи без времени в конце).
+`getStartDateTime().orElse(LocalDateTime.MAX)`.
 
 ### Хендлеры
 
@@ -339,89 +345,105 @@ HTTP-семантика: 201+Location на создание, 200 на update, 20
 `ExecutorService` (8 потоков), `shutdownNow` в `stop()`. Тест
 `TaskManagerConcurrencyTest` (16×50 = 800 параллельных `addTask`).
 
-### Этап 6 закрыт (ветка `develop-stage-6-api`, ждёт merge)
+### Этап 6 закрыт (PR #12, тег `v0.6-api`)
 
-- **Пагинация** для `GET /tasks | /subtasks | /epics`:
+- Пагинация для `GET /tasks | /subtasks | /epics`:
   `?from=0&size=20&status=NEW&sortBy=startDateTime`.
-  `from ≥ 0`, `size 1..100` (дефолт 20), `status` — enum или null,
-  `sortBy` — `id` (дефолт) или `startDateTime`.
-- **`QueryParams`** record + `parseQueryParams` + `comparatorFor` в `BaseHttpHandler`.
-- **Невалидные параметры** → 400 с сообщением про конкретный параметр.
-  Неизвестные параметры игнорируются. Не тримим — строгий контракт.
-- **`GET /health`** → `{"status":"UP"}`.
-- **`GET /version`** → `{"version":"0.2.0"}`. Версия — хардкод в `AppConfig.getVersion()`.
-- **Тесты:** 12 тестов пагинации (по 3 на ресурс: happy path / фильтр / сортировка / дефолт;
-  6 тестов валидации на `/tasks`; +4 теста на `/health` и `/version`).
-- **`docs/openapi.yaml`** — решили не делать. Спецификация вручную, быстро устаревает.
-- **Версионирование `/api/v1/...`** — не делаем.
+- `QueryParams` + `parseQueryParams` + `comparatorFor` в `BaseHttpHandler`.
+- Невалидные параметры → 400 с сообщением про конкретный параметр.
+- `GET /health` → `{"status":"UP"}`, `GET /version` → `{"version":"0.2.0"}`.
+- OpenAPI-спека и версионирование `/api/v1/` — не делаем.
 
-**Тестов:** 119 (BUILD SUCCESS).
+### Этап 7 закрыт (ветка `develop-stage-7-tests`, ждёт merge)
+
+**7.1 — `TaskManagerTest`:**
+- `assertThrows(NotFoundException.class, ...)` вместо `RuntimeException`.
+- Убраны все `System.out.println`.
+- Детерминированное время: `LocalDateTime.of(2026, 1, 1, 10, 0)` вместо `now()`.
+- Тесты на пересчёт полей `Epic` (duration/start/end/status).
+- Тесты `hashCode` для `Task`/`Subtask`/`Epic`.
+- Починен `check_Replace_Task_In_Prioritized_With_New_Time_Test` — теперь
+  проверяет `getStartDateTime()`, а не `contains()` (который срабатывал на
+  неполном `equals`).
+
+**7.2 — `TaskViewHistoryTest`:**
+- `removeRecord_First/Middle/Last` проверяют фактический порядок после удаления.
+- `addRecord_Same_Task_Twice_Test` проверяет перестановку в конец.
+- Вспомогательный `getHistoryIds()`.
+
+**7.3 — `LinkedHashMapCustomTest`:**
+- Перенесён в `utils` (к классу).
+- Проверка порядка после `removeEntry` для first/middle/last.
+- Негативные: несуществующий id, отрицательный id, `addLast(null)`.
+- Проверка, что `getListAllItem` возвращает копии (изменение возвращённого не
+  влияет на состояние).
+- Проверка независимости `createCopy` от оригинала (в обе стороны).
+
+**7.4 — `CsvStorageTest` (новый, взамен удалённого `FileBackedTaskManagerTest`):**
+- `save`: пустые коллекции (только заголовок), порядок TASK → EPIC → SUBTASK,
+  сортировка по id.
+- `load`: несуществующий файл → пустой `LoadedState`, только заголовок → пустой.
+- Круговой прогон save → load, повторный save перезаписывает.
+- Битые строки: короткая, неизвестный тип, пустые строки — пропускаются
+  с warn; нечисловой id — `RuntimeException`.
+- Read-only тест **не пишем** — нестабилен на Windows.
+
+**7.5 — `HttpTaskServerTest`:**
+- `HttpTaskServer(TaskManager, int port)` — явный порт.
+- Тесты на порту 0 (ОС выбирает свободный), `baseUrl` строится после `start()`.
+- **Один сервер на класс** (`@BeforeAll`/`@AfterAll`, статические поля).
+  Время прогона: 54 s → 1.7 s.
+- Убраны все `System.out.println`.
+- `.replace("NEW", "something")` → явный невалидный JSON.
+
+**7.6 — новые тесты:**
+- `CommaSeparatedValuesCreateProcessTest` — заголовок, `toString` всех типов,
+  парсинг из строк, битые строки.
+- `GsonAdaptersTest` — `LocalDateTimeTypeAdapter`, `DurationTypeAdapter`,
+  `AbstractTaskDeserializer` (все три типа + ошибки: нет `type`, `type: null`,
+  неизвестный `type`).
+
+**7.7 — параметризованные тесты:**
+- `EpicTest`: 10 кейсов «набор статусов подзадач → статус эпика» в одном
+  `@ParameterizedTest`.
+- `TaskManagerTest`: 10 кейсов пересечений интервалов (полное совпадение,
+  вложение, касание границ, раздельные интервалы, зазор 1 минута) +
+  негативный тест на `null`/без `startDateTime`.
+- Удалены 6 дублирующих `epic_Check_Status_Progress_*` из `TaskManagerTest`.
+
+**Тестов:** 195, BUILD SUCCESS.
 
 ## Что делаем сейчас
 
-**Активный этап:** Этап 7 — переработка тестов.
-**Ветка:** будет `develop-stage-7-tests` (создать от main после merge этапа 6).
+**Активный этап:** Этап 8 — инфраструктура (опционально).
+**Ветка:** будет `develop-stage-8-infra` (создать от main после merge).
 
-### Этап 7 — план
+### Этап 8 — план (все пункты опциональны, кроме 8.6)
 
-**Общие принципы:**
-- `assertThrows` — только с конкретными типами исключений, не `RuntimeException`.
-- Убрать все `System.out.println` из тестов.
-- Детерминированное время — `LocalDateTime.of(...)` вместо `now()`.
-- `@AfterEach` для очистки temp-файлов.
-- HTTP-тесты — на порту 0 (свободный от ОС), не хардкод 8080.
-- Проверять тело ответа, а не только статус-код, где осмысленно.
-
-**Конкретные задачи:**
-1. **`TaskManagerTest`:**
-    - `assertThrows(NotFoundException.class, ...)` вместо `RuntimeException`.
-    - Убрать `System.out.println`.
-    - `LocalDateTime.of` вместо `now()` в тестах приоритетов и пересечений.
-    - Добавить тесты на пересчёт полей `Epic` (duration/start/end/status) —
-      сейчас нет или слабо покрыто.
-    - Тесты на `hashCode` везде, где есть `equals`.
-2. **`TaskViewHistoryTest`** — уже отвязан от `TaskManagerTest`, но добавить
-   проверки фактического порядка после удаления (`removeRecord_First/Middle/Last`
-   сейчас проверяют только `SUCCESS`).
-3. **`LinkedHashMapCustomTest`** — проверить возврат копий, а не ссылок.
-4. **`HttpTaskServerTest`:**
-    - Порт 0 (`InetSocketAddress(0)` + `getAddress().getPort()`), не хардкод 8080.
-    - Один `HttpServer` на класс, не на тест (сейчас `start()`/`stop()` на каждом).
-    - `@AfterEach` — закрывать executor.
-    - Проверять тела ответов в тестах ошибок (сейчас часто только код).
-    - Заменить `.replace("NEW", "something")` на явный невалидный JSON —
-      `replace` может заменить лишнее.
-5. **Новые тесты:**
-    - `CsvStorageTest` — прямое тестирование save/load, битые строки, отсутствие
-      файла, read-only. Взамен удалённого `FileBackedTaskManagerTest`.
-    - Прямые тесты CSV-парсера (`CommaSeparatedValuesCreateProcess.toString` /
-      `getXFromStrings`).
-    - Тесты Gson-адаптеров (`LocalDateTimeTypeAdapter`, `DurationTypeAdapter`,
-      `AbstractTaskDeserializer` — в т.ч. отсутствующий `type`).
-    - Тесты на потерянные ветки `ResultOfOperation`.
-6. **Параметризованные тесты:**
-    - Эпик: набор статусов подзадач → статус эпика (7+ кейсов в один
-      `@ParameterizedTest`).
-    - Пересечение интервалов: 8–10 наборов (касание, вложение, полное совпадение).
-7. **`catch_Exception_When_Save_File_Read_Only_Test`** — судьба (нестабилен
-   на Windows): либо `@DisabledOnOs(OS.WINDOWS)`, либо удалить, либо заменить
-   другим способом эмулировать read-only.
+1. **Checkstyle** — `checkstyle.xml` + плагин в `pom.xml` (validate-фаза).
+   Цель: единый стиль, ловит длинные методы, отсутствие фигурных скобок,
+   магические числа.
+2. **SpotBugs** — плагин + минимальный exclude-фильтр.
+3. **JaCoCo** — плагин, покрытие, бейдж в README.
+4. **GitHub Actions** — `.github/workflows/ci.yml`: `mvn verify` на push/PR.
+5. **Dockerfile** — multi-stage: `maven:3-eclipse-temurin-17` →
+   `eclipse-temurin:17-jre`.
+6. **Синхронизация версии** — Maven resource filtering: `AppConfig.getVersion()`
+   читает из `pom.xml` через `project.version`, а не хардкод `"0.2.0"`.
+   Плюс `pom.xml` поднять до `0.7.0-SNAPSHOT` (или `1.0.0-SNAPSHOT` к финалу).
+7. **docker-compose.yml** — сервис + volume для `./data` (путь к `tasks.csv`).
+8. **README-ревизия** — обновить под итоговое состояние, добавить бейджи
+   (CI, coverage, version), актуальные разделы.
 
 ### Открытые мелочи
 
 - `isTimeIntersectBoth` и `isTimeIntersectWithOthers` в `TaskManager` — public,
-  нужны тестам. В этапе 7 — либо оставить (тесты), либо package-private +
-  перенести тесты в `service`.
+  нужны тестам. Можно закрыть до package-private (перенести тесты в тот же
+  пакет) или оставить.
 - `getTotalOfIdInWork` — public, нужен одному тесту.
 - `service/interfaces/` — директория опустела, можно удалить.
-- В `pom.xml` версия `0.2.0-SNAPSHOT` и `AppConfig.getVersion()` `"0.2.0"` —
-  две правды. Синхронизировать в этапе 8 (через Maven resource filtering).
-
-### Дальнейшие этапы
-
-- **Этап 8 (инфраструктура, опционально):** Checkstyle, SpotBugs, JaCoCo,
-  GitHub Actions, Dockerfile, docker-compose, синхронизация версии через
-  Maven resource filtering.
+- `pom.xml` версия `0.2.0-SNAPSHOT` и `AppConfig.getVersion()` `"0.2.0"` —
+  две правды. Синхронизировать через Maven resource filtering в 8.6.
 
 ## Принятые решения
 
@@ -444,6 +466,9 @@ HTTP-семантика: 201+Location на создание, 200 на update, 20
 | 15 | `QueryParams` — record (4 параметра) |
 | 16 | Контракт API строгий: не тримим параметры |
 | 17 | OpenAPI-спека и версионирование `/api/v1/` — не делаем |
+| 18 | Read-only тест для `CsvStorage` — не пишем (нестабилен на Windows) |
+| 19 | Один `HttpServer` на тестовый класс (`@BeforeAll`), порт 0 |
+| 20 | Параметризованные тесты через `@MethodSource` (сложные данные — `List`, `Arguments`) |
 
 ## Модель ветвления и тегов
 
@@ -452,19 +477,23 @@ HTTP-семантика: 201+Location на создание, 200 на update, 20
 - После этапа: PR на GitHub (base `main`), merge commit, тег на merge-коммит.
 
 **Теги:** `v0.1-before-refactor`, `v0.2-fixes`, `v0.3-http`, `v0.4-storage`,
-`v0.5-concurrency` — на main. `v0.6-api` — после merge текущей ветки.
-`v0.7-tests`, `v1.0-portfolio` — в будущем.
+`v0.5-concurrency`, `v0.6-api` — на main. `v0.7-tests` — после merge текущей
+ветки. `v1.0-portfolio` — после этапа 8 (финальный).
 
 ## Соглашения по коду и тестам
 
 - Отвечать по-русски.
 - **Тесты:** `@Nested`, `@DisplayName`, имена `methodName_Should_ExpectedBehavior_Test`.
-  `assertThrows` — только с конкретными типами исключений. Без `System.out.println`
-  (в этапе 7). Детерминированное время, не `now()` (в этапе 7). `@AfterEach` для
-  temp-файлов (в этапе 7). HTTP-тесты на порту 0 (в этапе 7).
+  `assertThrows` — только с конкретными типами. Без `System.out.println`.
+  Детерминированное время (`LocalDateTime.of`). HTTP-тесты на порту 0,
+  один сервер на класс. Параметризованные — `@MethodSource` для сложных данных,
+  `@ValueSource`/`@CsvSource` для простых.
 - **Code fence:** для вложенных — четыре бэктика снаружи.
 - Файлы присылаются целиком; не выдумывать методы/поля.
-- **Gson** работает через no-arg конструктор + reflection.
+- **Gson** работает через no-arg конструктор + reflection. При создании `Gson`
+  вручную обязательно регистрировать все три адаптера
+  (`LocalDateTime`, `Duration`, `AbstractTask`) — иначе `Duration` падает
+  на reflection в Java 17+ (`InaccessibleObjectException`).
 
 ## Окружение и известные грабли
 
@@ -488,6 +517,10 @@ HTTP-семантика: 201+Location на создание, 200 на update, 20
   `pom.xml` → **Add as Maven Project**.
 - **IDEA: Compact Middle Packages** — включить, чтобы дерево не разъезжалось.
   Путь: `File → Settings → Advanced Settings → Project View → Compact Middle Packages`.
+- **Gson + Duration в Java 17+:** при создании `Gson` без `DurationTypeAdapter`
+  десериализация `Task`/`Subtask` через reflection упадёт с
+  `InaccessibleObjectException` (поле `java.time.Duration#seconds` приватное).
+  Всегда регистрировать все три адаптера.
 - **Бэкап проекта:** PowerShell-скрипт `backup-javaProject.ps1` — зеркалирование
   `G:\javaProject` на флешку с меткой `BACKUP` через `robocopy /MIR`. Скрипт
   требует **UTF-8 with BOM** (иначе PowerShell 5.1 ломает кириллицу).

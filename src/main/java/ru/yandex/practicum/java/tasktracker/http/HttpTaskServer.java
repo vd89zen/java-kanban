@@ -26,20 +26,19 @@ public class HttpTaskServer {
     private final ExecutorService executor;
 
     public HttpTaskServer() throws IOException {
-        this.port = AppConfig.getServerPort();
-        this.executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
-        httpServer = HttpServer.create(new InetSocketAddress(port), BACKLOG);
-        httpServer.setExecutor(executor);
-        this.taskManager = ManagersUtil.getDefault();
-        createContext();
+        this(ManagersUtil.getDefault(), AppConfig.getServerPort());
     }
 
     public HttpTaskServer(TaskManager taskManager) throws IOException {
-        this.port = AppConfig.getServerPort();
-        this.executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
+        this(taskManager, AppConfig.getServerPort());
+    }
+
+    public HttpTaskServer(TaskManager taskManager, int port) throws IOException {
         this.taskManager = Objects.requireNonNull(taskManager, "'taskManager' can't be null");
+        this.executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
         httpServer = HttpServer.create(new InetSocketAddress(port), BACKLOG);
         httpServer.setExecutor(executor);
+        this.port = httpServer.getAddress().getPort();
         createContext();
     }
 
@@ -60,6 +59,10 @@ public class HttpTaskServer {
             log.warn("Interrupted while waiting for thread pool shutdown");
         }
         log.info("HTTP server stopped");
+    }
+
+    public int getPort() {
+        return port;
     }
 
     private void createContext() {
