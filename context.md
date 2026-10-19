@@ -3,61 +3,74 @@
 ## Проект
 
 Backend-сервис для управления задачами по методологии Kanban. Портфолио-проект на базе
-учебного Яндекс Практикума, в процессе доработки.
+учебного Яндекс Практикума. **Проект завершён**, версия `1.0.0-SNAPSHOT`, готовится
+тег `v1.0-portfolio`.
 
 Репозиторий: https://github.com/vd89zen/java-kanban
-Активная ветка: `develop-stage-7-tests` (этапы 0-1-2-3-4-5-6-7 закрыты, этап 8 следующий).
+Активная ветка: `develop-stage-8-infra` (все этапы 0-8 закрыты, ждёт merge и финальный тег).
 
-**Стек:** Java 17+, `com.sun.net.httpserver.HttpServer`, Gson, Maven, JUnit 5,
-SLF4J + Logback.
+**Стек:** Java 17+, `com.sun.net.httpserver.HttpServer`, Gson 2.11.0, Maven, JUnit 5,
+SLF4J + Logback, Checkstyle, SpotBugs, JaCoCo, GitHub Actions.
 
 **Окружение:** Windows, IntelliJ IDEA, JDK 21 (компиляция под 17 через `maven.compiler.release`).
 
 **Как собирать:**
-- В bash: `./mvnw clean test`, `./mvnw clean package`
-- В cmd: `mvnw.cmd clean test`
-- В IDEA: панель Maven, настроена на **Use Maven wrapper**
+- `./mvnw clean test` — тесты
+- `./mvnw clean package` — fat-jar в `target/java-kanban.jar`
+- `./mvnw clean verify` — тесты + Checkstyle + SpotBugs + JaCoCo
+- `./mvnw exec:java` — запуск без сборки jar
 
 **Как запускать:**
-- `java -jar target/java-kanban.jar` (fat-jar через shade)
-- `./mvnw exec:java` (запуск main-класса без сборки jar)
+- `java -jar target/java-kanban.jar` (fat-jar)
+- `./mvnw exec:java` (main-класс)
 
 **Переменные окружения:**
-- `SERVER_PORT` / `-Dserver.port` — порт сервера, дефолт 8080.
-- `DATA_FILE` / `-Ddata.file` — путь к CSV, дефолт `tasks.csv` в CWD.
+- `SERVER_PORT` / `-Dserver.port` — порт, дефолт 8080.
+- `DATA_FILE` / `-Ddata.file` — путь к CSV, дефолт `./tasks.csv`.
 
 ## Maven-конфигурация
 
 - `groupId` — `ru.yandex.practicum`, `artifactId` — `java-kanban`
-- `version` — `0.2.0-SNAPSHOT`
-- `finalName` — `java-kanban` (`target/java-kanban.jar`)
+- `version` — `1.0.0-SNAPSHOT`
+- `finalName` — `java-kanban`
 - `main.class` — `ru.yandex.practicum.java.tasktracker.TaskTrackerApplication`
-- `maven.compiler.release` — 17 (НЕ `source`/`target`)
+- `maven.compiler.release` — 17
+- `<argLine></argLine>` в properties — для `@{argLine}` (JaCoCo + UTF-8)
 
 **Зависимости:** gson 2.11.0, slf4j-api 2.0.13, logback-classic 1.5.6,
-junit-jupiter 5.10.2 (test, включая `junit-jupiter-params` для параметризованных тестов).
+junit-jupiter 5.10.2 (test).
 
-**Плагины:** maven-compiler 3.13.0, maven-surefire 3.2.5 (argLine с UTF-8),
-maven-shade 3.5.3 (Services + Manifest transformers), exec-maven-plugin 3.2.0.
+**Resource filtering:** `src/main/resources/` с `<filtering>true</filtering>`,
+`maven-resources-plugin` с `<propertiesEncoding>UTF-8</propertiesEncoding>`.
+`app.properties` с `app.version=${project.version}`.
+
+**Плагины (все в `<plugins>`):**
+- `maven-resources-plugin` 3.3.1 — filtering, propertiesEncoding
+- `maven-compiler-plugin` 3.13.0
+- `maven-checkstyle-plugin` 3.3.1 — `checkstyle.xml`, `failOnViolation=true`,
+  `violationSeverity=error`, `includeTestSourceDirectory=true`, фаза `validate`
+- `maven-surefire-plugin` 3.2.5 — `argLine=@{argLine} -Dfile.encoding=UTF-8 ...`
+- `jacoco-maven-plugin` 0.8.12 — `prepare-agent` + `report` на `verify`
+- `maven-shade-plugin` 3.5.3 — Services + Manifest transformers
+- `spotbugs-maven-plugin` 4.8.6.4 — `effort=Max`, `threshold=Low`,
+  `failOnError=true`, `spotbugs-exclude.xml`, фаза `verify`
+- `exec-maven-plugin` 3.2.0
 
 **Maven Wrapper:** `mvnw`, `mvnw.cmd`, `.mvn/wrapper/maven-wrapper.properties`.
+
+**Файлы качества:** `checkstyle.xml`, `suppressions.xml`, `spotbugs-exclude.xml`,
+`.github/workflows/ci.yml`.
 
 ## Архитектура
 
 ```
 TaskTrackerApplication
-  └── HttpTaskServer (com.sun.net.httpserver)  ← ExecutorService (fixed pool, 8)
-        ├── /tasks        → TasksHandler
-        ├── /subtasks     → SubtasksHandler
-        ├── /epics        → EpicsHandler
-        ├── /history      → HistoryHandler
-        ├── /prioritized  → PrioritizedHandler
-        ├── /health       → HealthHandler
-        └── /version      → VersionHandler
+  └── HttpTaskServer (com.sun.net.httpserver)  ← ExecutorService (fixed, 8)
+        ├── /tasks /subtasks /epics /history /prioritized /health /version
                 │
                 ▼
         TaskManager (класс, потокобезопасный)
-        ├── TaskViewHistory (потокобезопасный через synchronized)
+        ├── TaskViewHistory (synchronized, LinkedHashMapCustom)
         └── TaskStorage (интерфейс)
               ├── NoopStorage  (no-op)
               └── CsvStorage   (CSV-персистенция)
@@ -65,18 +78,19 @@ TaskTrackerApplication
 
 **Ключевые решения:**
 - Интерфейсы `TaskManager` и `HistoryManager` удалены — реализация одна,
-  полиморфизм переехал на `TaskStorage`.
-- `FileBackedTaskManager` удалён — заменён композицией `TaskManager(new CsvStorage(file))`.
-- Менеджер держит состояние в concurrent-коллекциях, все мутации — под единым локом.
-- Генерация id — монотонный счётчик `nextId`, без переиспользования удалённых id.
-- Пагинация, фильтры, сортировка — на уровне хендлеров, не в сервисе.
-- `HttpTaskServer` принимает явный порт (нужно для тестов на порту 0).
+  полиморфизм на `TaskStorage`.
+- `FileBackedTaskManager` удалён — композиция `TaskManager(new CsvStorage(file))`.
+- Менеджер: concurrent-коллекции + единый лок на мутации.
+- Генерация id — монотонный `nextId`, без переиспользования.
+- Пагинация, фильтры, сортировка — на уровне хендлеров.
+- Версия — единый источник `pom.xml`, в `app.properties` через resource filtering.
+- Checkstyle и SpotBugs валят сборку. JaCoCo — отчёт, CI — verify на каждый push.
 
 Пакеты:
 
 | Пакет | Назначение |
 |---|---|
-| `config` | `AppConfig` — чтение env/sysprop + версия |
+| `config` | `AppConfig` (env/sysprop + версия из properties) |
 | `http` | `HttpTaskServer` |
 | `http.handler` | Хендлеры, `BaseHttpHandler`, `QueryParams` |
 | `manage` | `ManagersUtil` |
@@ -93,217 +107,130 @@ TaskTrackerApplication
 ```
 .
 ├── .gitattributes / .gitignore / README.md / context.md
+├── .github/workflows/ci.yml
 ├── .mvn/wrapper/maven-wrapper.properties
 ├── mvnw / mvnw.cmd / pom.xml
-├── src/
-│   ├── main/
-│   │   ├── java/ru/yandex/practicum/java/tasktracker/
-│   │   │   ├── TaskTrackerApplication.java
-│   │   │   ├── config/AppConfig.java
-│   │   │   ├── exceptions/...
-│   │   │   ├── http/HttpTaskServer.java
-│   │   │   ├── http/handler/
-│   │   │   │   ├── BaseHttpHandler.java
-│   │   │   │   ├── QueryParams.java
-│   │   │   │   ├── TasksHandler.java
-│   │   │   │   ├── SubtasksHandler.java
-│   │   │   │   ├── EpicsHandler.java
-│   │   │   │   ├── HistoryHandler.java
-│   │   │   │   ├── PrioritizedHandler.java
-│   │   │   │   ├── HealthHandler.java
-│   │   │   │   └── VersionHandler.java
-│   │   │   ├── manage/ManagersUtil.java
-│   │   │   ├── service/
-│   │   │   │   ├── TaskManager.java
-│   │   │   │   └── TaskViewHistory.java
-│   │   │   ├── storage/
-│   │   │   │   ├── TaskStorage.java
-│   │   │   │   ├── LoadedState.java
-│   │   │   │   ├── NoopStorage.java
-│   │   │   │   └── CsvStorage.java
-│   │   │   ├── task/...
-│   │   │   └── utils/...
-│   │   └── resources/logback.xml
-│   └── test/java/ru/yandex/practicum/java/tasktracker/
-│       ├── http/HttpTaskServerTest.java
-│       ├── manage/ManagersUtilTest.java
-│       ├── service/
-│       │   ├── TaskManagerTest.java
-│       │   ├── TaskViewHistoryTest.java
-│       │   └── TaskManagerConcurrencyTest.java
-│       ├── storage/CsvStorageTest.java
-│       ├── task/
-│       │   ├── TaskTest.java
-│       │   ├── SubtaskTest.java
-│       │   └── EpicTest.java
-│       └── utils/
-│           ├── LinkedHashMapCustomTest.java
-│           ├── CommaSeparatedValuesCreateProcessTest.java
-│           └── gson/GsonAdaptersTest.java
+├── checkstyle.xml / suppressions.xml / spotbugs-exclude.xml
+├── docs/
+│   ├── architecture.md / api.md / storage.md / errors.md
+│   ├── configuration.md / testing.md
+├── src/main/java/ru/yandex/practicum/java/tasktracker/
+│   ├── TaskTrackerApplication.java
+│   ├── config/AppConfig.java
+│   ├── exceptions/...
+│   ├── http/HttpTaskServer.java
+│   ├── http/handler/  (Base + 7 хендлеров + QueryParams)
+│   ├── manage/ManagersUtil.java
+│   ├── service/  (TaskManager, TaskViewHistory)
+│   ├── storage/  (TaskStorage, LoadedState, NoopStorage, CsvStorage)
+│   ├── task/...
+│   └── utils/...
+├── src/main/resources/
+│   ├── app.properties
+│   └── logback.xml
+└── src/test/java/ru/yandex/practicum/java/tasktracker/
+    ├── config/AppConfigTest.java
+    ├── http/HttpTaskServerTest.java
+    ├── manage/ManagersUtilTest.java
+    ├── service/  (TaskManagerTest, TaskViewHistoryTest, TaskManagerConcurrencyTest)
+    ├── storage/CsvStorageTest.java
+    ├── task/  (TaskTest, SubtaskTest, EpicTest)
+    └── utils/  (LinkedHashMapCustomTest, CommaSeparatedValuesCreateProcessTest, gson/GsonAdaptersTest)
 ```
 
 ## Ключевые сигнатуры
 
 ### `service.TaskManager`
 
-Конструкторы:
 ```
-TaskManager()                      // внутри new NoopStorage()
-TaskManager(TaskStorage storage)   // storage != null
+TaskManager()                      // NoopStorage
+TaskManager(TaskStorage storage)
 ```
 
-Приватные поля: `int nextId`, `final Set<Integer> allIdInWork` (concurrent),
-`final Map<Integer, Task> tasks`, `epics`, `subtasks` (concurrent),
-`final NavigableSet<AbstractTask> prioritizedTasks` (concurrent),
-`final TaskViewHistory historyManager`, `final TaskStorage storage`,
-`final Object lock`.
+Поля: `int nextId`, `Set<Integer> allIdInWork` (concurrent),
+`Map<Integer, Task> tasks`, `epics`, `subtasks` (concurrent),
+`NavigableSet<AbstractTask> prioritizedTasks` (concurrent),
+`TaskViewHistory historyManager`, `TaskStorage storage`, `Object lock`.
 
-Приватные методы: `generateIdNumber()`, `addToPriorityList(AbstractTask)`,
-`initFromStorage()`, `persist()`, `verifyIntegrity()`.
+Приватные: `generateIdNumber()`, `addToPriorityList`, `initFromStorage()`,
+`persist()`, `verifyIntegrity()`.
 
-Публичные методы: `getPrioritizedTasks`, `isTimeIntersectBoth`,
-`isTimeIntersectWithOthers`, `getHistory`, `getTotalOfIdInWork`,
-`addTask`, `getTaskByIdNumber`, `removeTaskByIdNumber`, `updateTask`,
-`getAllTasks`, `removeAllTasks`, `addEpic`, `getEpicByIdNumber`,
-`removeEpicByIdNumber`, `updateEpicName`, `updateEpicDescription`,
-`getAllSubtasksFromEpic`, `getAllEpics`, `removeAllEpics`, `addSubtask`,
-`getSubtaskByIdNumber`, `removeSubtaskByIdNumber`, `updateSubtask`,
+Публичные: `getPrioritizedTasks`, `isTimeIntersectBoth`, `isTimeIntersectWithOthers`,
+`getHistory`, `getTotalOfIdInWork`, `addTask`, `getTaskByIdNumber`,
+`removeTaskByIdNumber`, `updateTask`, `getAllTasks`, `removeAllTasks`,
+`addEpic`, `getEpicByIdNumber`, `removeEpicByIdNumber`, `updateEpicName`,
+`updateEpicDescription`, `getAllSubtasksFromEpic`, `getAllEpics`, `removeAllEpics`,
+`addSubtask`, `getSubtaskByIdNumber`, `removeSubtaskByIdNumber`, `updateSubtask`,
 `getAllSubtasks`, `removeAllSubtasks`.
 
-**Потокобезопасность:** все мутации — под `synchronized (lock)`, `persist()`
-вне лока. Порядок захвата: `lock` → монитор `TaskViewHistory`. Deadlock исключён.
+**Потокобезопасность:** все мутации под `synchronized (lock)`, `persist()` вне
+лока. Порядок: `lock` → монитор `TaskViewHistory`.
 
 ### `service.TaskViewHistory`
 
 ```
-TaskViewHistory()
 synchronized ResultOfOperation addRecord(AbstractTask)
 synchronized ResultOfOperation removeRecord(int)
 synchronized ArrayList<AbstractTask> getHistory()
 ```
 
-### `storage.TaskStorage` (интерфейс)
+### `storage.TaskStorage` / `LoadedState`
 
 ```
-void save(Collection<Task> tasks, Collection<Epic> epics, Collection<Subtask> subtasks)
+void save(Collection<Task>, Collection<Epic>, Collection<Subtask>)
 LoadedState load()
-```
 
-### `storage.LoadedState` (record)
-
-```
 record LoadedState(Collection<Task> tasks, Collection<Epic> epics, Collection<Subtask> subtasks)
 ```
 
-### `storage.NoopStorage` / `storage.CsvStorage`
+### `storage.CsvStorage`
 
-`CsvStorage.save` сортирует по id, `load` пропускает битые строки с warn-логом.
-Заголовок CSV: `id,type,name,description,statusProgress,parentEpic,childSubtasks,durationInMinutes,startDateTime,endDateTime`.
-Плейсхолдеры: `SKIP`, `EMPTY`.
-
-### `manage.ManagersUtil`
-
-```
-static TaskManager getDefault()
-static TaskViewHistory getDefaultHistory()
-static TaskManager getFileBacked()
-static TaskManager getFileBacked(File)
-```
+`CsvStorage(File file)`. `save` сортирует по id, `load` пропускает битые строки
+с warn-логом. Формат CSV — 10 колонок, плейсхолдеры `SKIP`/`EMPTY`.
 
 ### `config.AppConfig`
 
 ```
 static int getServerPort()      // env SERVER_PORT / -Dserver.port / 8080
 static String getDataFilePath() // env DATA_FILE / -Ddata.file / "tasks.csv"
-static String getVersion()      // "0.2.0" (хардкод, синхронизация с pom — в этапе 8)
+static String getVersion()      // из app.properties (Maven resource filtering)
 ```
 
-### `LinkedHashMapCustom`
+### `http.HttpTaskServer`
 
 ```
-LinkedHashMapCustom()
-LinkedHashMapCustom createCopy()
-ResultOfOperation addLast(AbstractTask)
-ResultOfOperation removeEntry(int)
-ArrayList<AbstractTask> getListAllItem()
-Integer getSize()
-boolean equals(Object)
-int hashCode()
+HttpTaskServer()                              // port из AppConfig
+HttpTaskServer(TaskManager)                   // port из AppConfig
+HttpTaskServer(TaskManager, int port)         // явный порт (0 — свободный)
+void start() / void stop()                    // + ExecutorService (8), shutdownNow
+int getPort()                                 // фактический порт
 ```
 
-### `AbstractTask`
-
-Default-конструктор: `idNumber = -1`, `durationInMinutes = Duration.ZERO`.
-**Gson десериализует через no-arg конструктор + reflection.** При POST без `id`
-получаем `idNumber = -1` — хендлеры нормализуют в `0` в ветке создания.
-
-Публичные методы: `getName`, `setName`, `getDescription`, `setDescription`,
-`setIdNumber`, `getIdNumber`, `getStatusProgress`, `getTypeTask`,
-`getDurationInMinutes`, `getStartDateTime`, `getEndDateTime`.
-
-### `Task` / `Subtask` / `Epic`
-
-Как раньше. `Subtask` — валидация родителя в приватном `validateParentEpicId(int)`.
-`Epic` — вложенный `SubtaskFields` с `equals`/`hashCode`.
-
-### `HttpTaskServer`
-
-```
-HttpTaskServer() throws IOException                        // port из AppConfig
-HttpTaskServer(TaskManager) throws IOException             // port из AppConfig
-HttpTaskServer(TaskManager, int port) throws IOException   // явный порт (0 — свободный от ОС)
-void start()
-void stop()          // stop(1) + executor.shutdownNow() + awaitTermination(1s)
-int getPort()        // фактический порт (после создания HttpServer)
-```
-
-`THREAD_POOL_SIZE = 8`, `SHUTDOWN_TIMEOUT_SECONDS = 1`.
-Контексты: `/tasks`, `/subtasks`, `/epics`, `/history`, `/prioritized`,
-`/health`, `/version`.
-
-### `QueryParams` (record)
+### `http.handler.QueryParams` (record)
 
 ```
 record QueryParams(int from, int size, StatusProgress status, String sortBy)
-static QueryParams defaults()  // from=0, size=20, status=null, sortBy="id"
+static QueryParams defaults()  // 0, 20, null, "id"
 ```
 
-### `BaseHttpHandler`
+### `http.handler.BaseHttpHandler`
 
-Константа `CONTENT_TYPE_JSON`. Хелперы: `sendText` (200), `sendCreated` (201),
-`sendNoContent` (204), `sendNotFound` (404), `sendBadRequest` (400),
-`sendConflict` (409), `sendMethodNotAllowed` (405 + `Allow`),
-`sendUnsupportedMediaType` (415), `sendError` (500).
+Хелперы: `sendText` (200), `sendCreated` (201), `sendNoContent` (204),
+`sendNotFound` (404), `sendBadRequest` (400), `sendConflict` (409),
+`sendMethodNotAllowed` (405 + `Allow`), `sendUnsupportedMediaType` (415),
+`sendError` (500).
 
-**Пагинация:**
-```
-protected QueryParams parseQueryParams(HttpExchange httpExchange)
-protected Comparator<AbstractTask> comparatorFor(String sortBy)
-```
+`protected QueryParams parseQueryParams(HttpExchange)` — валидация query-параметров,
+`BadRequestException` → 400. Не тримим — строгий контракт.
 
-`parseQueryParams` бросает `BadRequestException` (→ 400) при невалидных
-параметрах. Неизвестные параметры игнорируются. Не тримим — строгий контракт.
-`comparatorFor`: `"id"` → по `getIdNumber()`, `"startDateTime"` → по
-`getStartDateTime().orElse(LocalDateTime.MAX)`.
+`protected Comparator<AbstractTask> comparatorFor(String sortBy)` — `id` или
+`startDateTime` (без времени → в конец).
 
-### Хендлеры
+### `utils.AbstractTask`
 
-**Общее:** POST создание → 201 + Location, обновление → 200 (кроме
-`EpicsHandler` — 400), DELETE → 204, неверный `Content-Type` → 415,
-неподдерживаемый метод → 405 + `Allow`, пересечение интервалов → 409,
-пустой список → 200 + [].
-
-**`GET /tasks`, `GET /subtasks`, `GET /epics`:** пагинация через
-`parseQueryParams`, фильтр по `status`, сортировка через `comparatorFor`,
-`.skip(from).limit(size)`.
-
-**`GET /health`:** `200 {"status":"UP"}`. Только GET.
-**`GET /version`:** `200 {"version":"0.2.0"}`. Только GET.
-
-### `CommaSeparatedValuesCreateProcess`
-
-Как в этапе 4. `setFieldsFromStrings` проверяет `fields.length >= 10` и ловит
-`NumberFormatException`.
+Default-конструктор: `idNumber = -1`, `durationInMinutes = Duration.ZERO`.
+Gson десериализует через no-arg конструктор + reflection. Хендлеры нормализуют
+`idNumber` в `0` в ветке создания.
 
 ### Enums
 
@@ -312,138 +239,77 @@ protected Comparator<AbstractTask> comparatorFor(String sortBy)
 - `HttpResponseCode`: 200, 201, 204, 400, 404, 405, 409, 415, 500.
 - `ResultOfOperation`: 13 значений.
 
-## Что уже сделано
+## Что уже сделано (все этапы закрыты)
 
-### Этапы 0-1-2 закрыты (PR #8, тег `v0.2-fixes`)
+### Этапы 0-2 (PR #8, `v0.2-fixes`)
+Maven + wrapper, `Main` → `TaskTrackerApplication`, logback. Баг-фиксы (NPE в
+`AbstractTask()`, `Epic.SubtaskFields` equals/hashCode, bounds-check в CSV,
+null-check в десериализаторе, `toString`, `Subtask` dedup, SLF4J). Code smells
+(`AppConfig`, убраны mutable-поля, сортировка CSV, удалён `DataForUserScenario`,
+`getAllSubtasksFromEpic` через данные эпика). POST без `id` создаёт ресурс, NPE в
+`save` для файла без родителя.
 
-Maven + wrapper, Maven-layout, `Main` → `TaskTrackerApplication`, logback.
-Баг-фиксы (NPE в `AbstractTask()`, `Epic.SubtaskFields` equals/hashCode,
-bounds-check в CSV, null-check в десериализаторе, `toString` в 4 классах,
-дедупликация `Subtask`, SLF4J). Code smells (`AppConfig`, убраны mutable-поля,
-сортировка CSV, удалён `DataForUserScenario`, `getAllSubtasksFromEpic` через
-данные эпика). Плюс: POST без `id` создаёт ресурс, NPE в `save` для файла без
-родителя.
+### Этап 3 (PR #9, `v0.3-http`)
+HTTP-семантика: 201+Location, 200 на update, 204 на delete, 409 на пересечение,
+415 на Content-Type, 405 на метод, 200+[] на пустом списке.
 
-### Этап 3 закрыт (PR #9, тег `v0.3-http`)
+### Этап 4 (PR #10, `v0.4-storage`)
+`TaskStorage` + `LoadedState`, `NoopStorage` + `CsvStorage`. `InMemoryTaskManager` →
+`TaskManager`, `InMemoryHistoryManager` → `TaskViewHistory`. `FileBackedTaskManager`
+удалён. Интерфейсы `TaskManager`/`HistoryManager` удалены. `initFromStorage()` +
+`verifyIntegrity()`.
 
-HTTP-семантика: 201+Location на создание, 200 на update, 204 на delete,
-409 на пересечение, 415 на неверный Content-Type, 405 на метод, 200+[] на
-пустом списке.
-
-### Этап 4 закрыт (PR #10, тег `v0.4-storage`)
-
-`TaskStorage` + `LoadedState`, `NoopStorage` + `CsvStorage`.
-`InMemoryTaskManager` → `TaskManager`, `InMemoryHistoryManager` → `TaskViewHistory`.
-`FileBackedTaskManager` удалён. Интерфейсы `TaskManager` и `HistoryManager` удалены.
-`initFromStorage()` + `verifyIntegrity()`.
-
-### Этап 5 закрыт (PR #11, тег `v0.5-concurrency`)
-
-Генерация id: монотонный `nextId`, без переиспользования. Concurrent-коллекции.
-Единый лок `Object lock` для всех мутаций, `persist()` вне лока. `TaskViewHistory`
-— методы `synchronized`. Javadoc на `TaskManager`. `HttpTaskServer` —
-`ExecutorService` (8 потоков), `shutdownNow` в `stop()`. Тест
+### Этап 5 (PR #11, `v0.5-concurrency`)
+Монотонный `nextId` без переиспользования. Concurrent-коллекции. Единый `Object lock`,
+`persist()` вне лока. `TaskViewHistory` — `synchronized`. Javadoc на `TaskManager`.
+`HttpTaskServer` — `ExecutorService` (8), `shutdownNow` в `stop()`.
 `TaskManagerConcurrencyTest` (16×50 = 800 параллельных `addTask`).
 
-### Этап 6 закрыт (PR #12, тег `v0.6-api`)
+### Этап 6 (PR #12, `v0.6-api`)
+Пагинация `?from&size&status&sortBy` для `GET /tasks|/subtasks|/epics`.
+`QueryParams` + `parseQueryParams` + `comparatorFor`. Невалидные параметры → 400.
+`GET /health` → `{"status":"UP"}`, `GET /version` → `{"version": ...}`.
 
-- Пагинация для `GET /tasks | /subtasks | /epics`:
-  `?from=0&size=20&status=NEW&sortBy=startDateTime`.
-- `QueryParams` + `parseQueryParams` + `comparatorFor` в `BaseHttpHandler`.
-- Невалидные параметры → 400 с сообщением про конкретный параметр.
-- `GET /health` → `{"status":"UP"}`, `GET /version` → `{"version":"0.2.0"}`.
-- OpenAPI-спека и версионирование `/api/v1/` — не делаем.
+### Этап 7 (PR #13, `v0.7-tests`)
+Переработка тестов: конкретные исключения, детерминированное время, без print'ов,
+`@AfterEach` для temp-файлов, порт 0 для HTTP-тестов, один сервер на класс (54 s → 1.7 s),
+`CsvStorageTest`, `CommaSeparatedValuesCreateProcessTest`, `GsonAdaptersTest`,
+параметризованные тесты (`@ParameterizedTest` для статусов эпика и пересечений
+интервалов). Удалены 6 дублирующих `epic_Check_Status_Progress_*`.
 
-### Этап 7 закрыт (ветка `develop-stage-7-tests`, ждёт merge)
+### Этап 8 (ветка `develop-stage-8-infra`, ждёт merge, тег `v1.0-portfolio`)
+- **8.1 Checkstyle:** `checkstyle.xml` (из filmorate, адаптирован), `suppressions.xml`,
+  `failOnViolation=true`, `violationSeverity=error`. 29 нарушений → 0 (переименование
+  `@Nested`-классов, `static final` для констант, `prepareForTest`).
+- **8.2 SpotBugs:** `spotbugs-exclude.xml`, `failOnError=true`. Найдено 39 → исправлены
+  реальные (8×`DM_BOXED_PRIMITIVE_FOR_PARSING`, 2×`RC_REF_COMPARISON` в
+  `LinkedHashMapCustom.NodeCustom.equals`, 2×`SF_SWITCH_NO_DEFAULT`, 1×`SIC_INNER_SHOULD_BE_STATIC`
+  для `Epic.SubtaskFields`) → подавлены ложные (17×`CT_CONSTRUCTOR_THROW`, 6×`EI_EXPOSE_REP*`,
+  1×`MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR`, 3×`URF_UNREAD_FIELD`) → 0.
+- **8.3 JaCoCo:** отчёт в `target/site/jacoco/`. Покрытие 78% → 80% после добавления
+  `AppConfigTest` и расширения `ManagersUtilTest`.
+- **8.4 GitHub Actions:** `.github/workflows/ci.yml` — `mvnw clean verify` на push
+  в `main`/`develop-*` и PR в `main`. JaCoCo-отчёт в артефактах. Зелёный.
+- **8.5 Dockerfile / 8.7 docker-compose:** не делаем (решение этапа 8).
+- **8.6 Синхронизация версии:** `app.properties` с `app.version=${project.version}`,
+  resource filtering, `AppConfig.getVersion()` читает properties. Версия `pom.xml`
+  поднята до `1.0.0-SNAPSHOT`. Тест `endpointVersion_Get_Test` использует
+  `AppConfig.getVersion()`, не хардкод.
+- **8.8 README + docs/:** README сокращён, документация в `docs/` (architecture,
+  api, storage, errors, configuration, testing). Бейджи: CI, Coverage (80%),
+  Java 17.
 
-**7.1 — `TaskManagerTest`:**
-- `assertThrows(NotFoundException.class, ...)` вместо `RuntimeException`.
-- Убраны все `System.out.println`.
-- Детерминированное время: `LocalDateTime.of(2026, 1, 1, 10, 0)` вместо `now()`.
-- Тесты на пересчёт полей `Epic` (duration/start/end/status).
-- Тесты `hashCode` для `Task`/`Subtask`/`Epic`.
-- Починен `check_Replace_Task_In_Prioritized_With_New_Time_Test` — теперь
-  проверяет `getStartDateTime()`, а не `contains()` (который срабатывал на
-  неполном `equals`).
+**Тестов:** 200+ (точное — `./mvnw test` покажет `Tests run: N`).
+**Покрытие:** ~80%.
+**Все проверки зелёные:** `./mvnw clean verify` + CI.
 
-**7.2 — `TaskViewHistoryTest`:**
-- `removeRecord_First/Middle/Last` проверяют фактический порядок после удаления.
-- `addRecord_Same_Task_Twice_Test` проверяет перестановку в конец.
-- Вспомогательный `getHistoryIds()`.
+## Что дальше
 
-**7.3 — `LinkedHashMapCustomTest`:**
-- Перенесён в `utils` (к классу).
-- Проверка порядка после `removeEntry` для first/middle/last.
-- Негативные: несуществующий id, отрицательный id, `addLast(null)`.
-- Проверка, что `getListAllItem` возвращает копии (изменение возвращённого не
-  влияет на состояние).
-- Проверка независимости `createCopy` от оригинала (в обе стороны).
-
-**7.4 — `CsvStorageTest` (новый, взамен удалённого `FileBackedTaskManagerTest`):**
-- `save`: пустые коллекции (только заголовок), порядок TASK → EPIC → SUBTASK,
-  сортировка по id.
-- `load`: несуществующий файл → пустой `LoadedState`, только заголовок → пустой.
-- Круговой прогон save → load, повторный save перезаписывает.
-- Битые строки: короткая, неизвестный тип, пустые строки — пропускаются
-  с warn; нечисловой id — `RuntimeException`.
-- Read-only тест **не пишем** — нестабилен на Windows.
-
-**7.5 — `HttpTaskServerTest`:**
-- `HttpTaskServer(TaskManager, int port)` — явный порт.
-- Тесты на порту 0 (ОС выбирает свободный), `baseUrl` строится после `start()`.
-- **Один сервер на класс** (`@BeforeAll`/`@AfterAll`, статические поля).
-  Время прогона: 54 s → 1.7 s.
-- Убраны все `System.out.println`.
-- `.replace("NEW", "something")` → явный невалидный JSON.
-
-**7.6 — новые тесты:**
-- `CommaSeparatedValuesCreateProcessTest` — заголовок, `toString` всех типов,
-  парсинг из строк, битые строки.
-- `GsonAdaptersTest` — `LocalDateTimeTypeAdapter`, `DurationTypeAdapter`,
-  `AbstractTaskDeserializer` (все три типа + ошибки: нет `type`, `type: null`,
-  неизвестный `type`).
-
-**7.7 — параметризованные тесты:**
-- `EpicTest`: 10 кейсов «набор статусов подзадач → статус эпика» в одном
-  `@ParameterizedTest`.
-- `TaskManagerTest`: 10 кейсов пересечений интервалов (полное совпадение,
-  вложение, касание границ, раздельные интервалы, зазор 1 минута) +
-  негативный тест на `null`/без `startDateTime`.
-- Удалены 6 дублирующих `epic_Check_Status_Progress_*` из `TaskManagerTest`.
-
-**Тестов:** 195, BUILD SUCCESS.
-
-## Что делаем сейчас
-
-**Активный этап:** Этап 8 — инфраструктура (опционально).
-**Ветка:** будет `develop-stage-8-infra` (создать от main после merge).
-
-### Этап 8 — план (все пункты опциональны, кроме 8.6)
-
-1. **Checkstyle** — `checkstyle.xml` + плагин в `pom.xml` (validate-фаза).
-   Цель: единый стиль, ловит длинные методы, отсутствие фигурных скобок,
-   магические числа.
-2. **SpotBugs** — плагин + минимальный exclude-фильтр.
-3. **JaCoCo** — плагин, покрытие, бейдж в README.
-4. **GitHub Actions** — `.github/workflows/ci.yml`: `mvn verify` на push/PR.
-5. **Dockerfile** — multi-stage: `maven:3-eclipse-temurin-17` →
-   `eclipse-temurin:17-jre`.
-6. **Синхронизация версии** — Maven resource filtering: `AppConfig.getVersion()`
-   читает из `pom.xml` через `project.version`, а не хардкод `"0.2.0"`.
-   Плюс `pom.xml` поднять до `0.7.0-SNAPSHOT` (или `1.0.0-SNAPSHOT` к финалу).
-7. **docker-compose.yml** — сервис + volume для `./data` (путь к `tasks.csv`).
-8. **README-ревизия** — обновить под итоговое состояние, добавить бейджи
-   (CI, coverage, version), актуальные разделы.
-
-### Открытые мелочи
-
-- `isTimeIntersectBoth` и `isTimeIntersectWithOthers` в `TaskManager` — public,
-  нужны тестам. Можно закрыть до package-private (перенести тесты в тот же
-  пакет) или оставить.
-- `getTotalOfIdInWork` — public, нужен одному тесту.
-- `service/interfaces/` — директория опустела, можно удалить.
-- `pom.xml` версия `0.2.0-SNAPSHOT` и `AppConfig.getVersion()` `"0.2.0"` —
-  две правды. Синхронизировать через Maven resource filtering в 8.6.
+Проект завершён. Осталось:
+1. Merge `develop-stage-8-infra` в `main` через PR.
+2. Тег `v1.0-portfolio` на merge-коммит.
+3. (Опционально) Убрать `-SNAPSHOT` из версии → `1.0.0`, пересобрать, обновить
+   `app.properties` через rebuild.
 
 ## Принятые решения
 
@@ -467,8 +333,14 @@ HTTP-семантика: 201+Location на создание, 200 на update, 20
 | 16 | Контракт API строгий: не тримим параметры |
 | 17 | OpenAPI-спека и версионирование `/api/v1/` — не делаем |
 | 18 | Read-only тест для `CsvStorage` — не пишем (нестабилен на Windows) |
-| 19 | Один `HttpServer` на тестовый класс (`@BeforeAll`), порт 0 |
-| 20 | Параметризованные тесты через `@MethodSource` (сложные данные — `List`, `Arguments`) |
+| 19 | Один `HttpServer` на тестовый класс, порт 0 |
+| 20 | Параметризованные тесты через `@MethodSource` |
+| 21 | Checkstyle: конфиг из filmorate (MethodName с подчёркиваниями, звёздочные импорты разрешены) |
+| 22 | SpotBugs: `failOnError=true`, exclude для ложных срабатываний |
+| 23 | JaCoCo: отчёт на `verify`, без codecov (статический бейдж 80%) |
+| 24 | GitHub Actions: `mvnw clean verify` + артефакт JaCoCo |
+| 25 | Версия: единый источник `pom.xml` через resource filtering |
+| 26 | Dockerfile / docker-compose — не делаем |
 
 ## Модель ветвления и тегов
 
@@ -477,62 +349,65 @@ HTTP-семантика: 201+Location на создание, 200 на update, 20
 - После этапа: PR на GitHub (base `main`), merge commit, тег на merge-коммит.
 
 **Теги:** `v0.1-before-refactor`, `v0.2-fixes`, `v0.3-http`, `v0.4-storage`,
-`v0.5-concurrency`, `v0.6-api` — на main. `v0.7-tests` — после merge текущей
-ветки. `v1.0-portfolio` — после этапа 8 (финальный).
+`v0.5-concurrency`, `v0.6-api`, `v0.7-tests` — на main.
+`v1.0-portfolio` — после merge текущей ветки (финальный).
 
 ## Соглашения по коду и тестам
 
 - Отвечать по-русски.
 - **Тесты:** `@Nested`, `@DisplayName`, имена `methodName_Should_ExpectedBehavior_Test`.
-  `assertThrows` — только с конкретными типами. Без `System.out.println`.
-  Детерминированное время (`LocalDateTime.of`). HTTP-тесты на порту 0,
-  один сервер на класс. Параметризованные — `@MethodSource` для сложных данных,
-  `@ValueSource`/`@CsvSource` для простых.
+  `assertThrows` — конкретные типы. Без `System.out.println`. Детерминированное время
+  (`LocalDateTime.of`). HTTP-тесты на порту 0, один сервер на класс. Параметризованные
+  — `@MethodSource` для сложных данных.
+- **Checkstyle валит сборку** — методы разворачивать, `{` с новой строки, отделять
+  `METHOD_DEF` пустой строкой, `@Nested`-классы с заглавной буквы, константы
+  `static final`.
+- **SpotBugs валит сборку.** Новые реальные баги не подавляем — правим. Если
+  ложное срабатывание — точечно в `spotbugs-exclude.xml` с комментарием.
 - **Code fence:** для вложенных — четыре бэктика снаружи.
 - Файлы присылаются целиком; не выдумывать методы/поля.
 - **Gson** работает через no-arg конструктор + reflection. При создании `Gson`
-  вручную обязательно регистрировать все три адаптера
-  (`LocalDateTime`, `Duration`, `AbstractTask`) — иначе `Duration` падает
-  на reflection в Java 17+ (`InaccessibleObjectException`).
+  вручную обязательно регистрировать все три адаптера (`LocalDateTime`, `Duration`,
+  `AbstractTask`) — иначе `Duration` падает на reflection в Java 17+.
 
 ## Окружение и известные грабли
 
 - Windows, IDEA, JDK 21 (собираем под 17).
 - Maven не в PATH системного bash. Используем `./mvnw ...`.
 - Пути в bash — прямые слэши: `git add src/main`, не `src\main`.
-- В Surefire прописан `argLine` с UTF-8. При запуске из IDEA-панели —
-  `JAVA_TOOL_OPTIONS` в `Settings → Build → Build Tools → Maven → Runner`.
-- `mvn clean` может падать с `Failed to delete target` — файл-лок на Windows
-  (IDEA, антивирус, проводник). Лечится закрытием IDEA и `rm -rf target`.
+- В Surefire: `argLine=@{argLine} -Dfile.encoding=UTF-8 ...` — `@{argLine}`
+  подставляет JaCoCo agent, остальное — UTF-8 для кириллицы на Windows.
+- `mvn clean` может падать с `Failed to delete target` — файл-лок на Windows.
+  Лечится закрытием IDEA и `rm -rf target`.
 - `.gitattributes` нормализует `.java` в LF. Warning про CRLF — нормально.
 - `idNumber = -1` — маркер «пустышка». Gson даёт `-1` при POST без `id`;
   хендлеры нормализуют в `0` в ветке создания.
 - **Пересечение интервалов включает касание границ.** `t1.end == t2.start`
   считается пересечением. В тестах с массовым добавлением задач нужен
-  достаточный шаг между `startDateTime` (например, шаг 20 мин при duration 10).
+  достаточный шаг между `startDateTime`.
 - **IDEA: тесты не запускаются через кнопку Run, а `./mvnw test` работает.**
-  Симптом: `package org.junit.jupiter.api does not exist`. Причина: IDEA
-  использует свой native build system, не Maven. Решение: Maven-панель →
-  правый клик по корню → **Unlink Maven Projects**, затем правый клик по
-  `pom.xml` → **Add as Maven Project**.
-- **IDEA: Compact Middle Packages** — включить, чтобы дерево не разъезжалось.
-  Путь: `File → Settings → Advanced Settings → Project View → Compact Middle Packages`.
+  Причина: IDEA использует свой native build system, не Maven. Решение:
+  Maven-панель → правый клик по корню → **Unlink Maven Projects**, затем
+  правый клик по `pom.xml` → **Add as Maven Project**.
+- **IDEA: Compact Middle Packages** — `File → Settings → Advanced Settings →
+  Project View → Compact Middle Packages`.
 - **Gson + Duration в Java 17+:** при создании `Gson` без `DurationTypeAdapter`
   десериализация `Task`/`Subtask` через reflection упадёт с
-  `InaccessibleObjectException` (поле `java.time.Duration#seconds` приватное).
-  Всегда регистрировать все три адаптера.
-- **Бэкап проекта:** PowerShell-скрипт `backup-javaProject.ps1` — зеркалирование
-  `G:\javaProject` на флешку с меткой `BACKUP` через `robocopy /MIR`. Скрипт
-  требует **UTF-8 with BOM** (иначе PowerShell 5.1 ломает кириллицу).
-  Автоопределение флешки через `Get-Volume | Where FileSystemLabel -eq 'BACKUP'`.
+  `InaccessibleObjectException`. Всегда регистрировать все три адаптера.
+- **Resource filtering в IDEA:** при прямом запуске из IDEA (не через Maven)
+  `app.properties` может содержать `${project.version}` как есть. Запускать
+  через `./mvnw exec:java` или `java -jar target/java-kanban.jar`, либо включить
+  `Delegate IDE build/run actions to Maven` в настройках Maven.
+- **SpotBugs:** `threshold=Low` + `effort=Max` — максимум предупреждений. Ложные
+  подавлены в `spotbugs-exclude.xml` с комментариями. Новые реальные баги — правим,
+  не подавляем.
 
 ## Ожидаемое действие от ассистента в новом чате
 
 1. **Прочитать `context.md` целиком.**
-2. **Подтвердить понимание в одном-двух предложениях:** активный этап, следующий
-   шаг, ветка.
-3. **Задать уточняющий вопрос:** «На какой стадии этапа мы сейчас? Что уже
-   закоммичено, что ещё нет?»
+2. **Подтвердить понимание в одном-двух предложениях:** статус проекта, следующий шаг.
+3. **Задать уточняющий вопрос:** «На каком этапе мы сейчас? Что уже закоммичено,
+   что ещё нет?»
 4. **Дождаться ответа.**
 5. **Проверить актуальность.** При сомнениях — попросить текущие версии файлов.
 6. **Не выдумывать методы и поля.** Если нужен метод, а его нет в «Ключевых
@@ -551,4 +426,4 @@ HTTP-семантика: 201+Location на создание, 200 на update, 20
 - Для ответов с вложенными code fence использовать четыре бэктика снаружи.
 - Коммиты — лаконичные, но информативные.
 - **Обновление `context.md` в конце каждого этапа.**
-- **PLAN.md** — локальный, в `.gitignore`, в репо не публикуется.
+- Общий **PLAN** — локальный, в репо не публикуется.
