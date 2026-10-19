@@ -6,7 +6,7 @@ Backend-сервис для управления задачами по мето�
 учебного Яндекс Практикума, в процессе доработки.
 
 Репозиторий: https://github.com/vd89zen/java-kanban
-Активная ветка: `develop-stage-5-concurrency` (этапы 0-1-2-3-4-5 закрыты, этап 6 следующий).
+Активная ветка: `develop-stage-6-api` (этапы 0-1-2-3-4-5-6 закрыты, этап 7 следующий).
 
 **Стек:** Java 17+, `com.sun.net.httpserver.HttpServer`, Gson, Maven, JUnit 5,
 SLF4J + Logback.
@@ -46,12 +46,14 @@ maven-shade 3.5.3 (Services + Manifest transformers), exec-maven-plugin 3.2.0.
 
 ```
 TaskTrackerApplication
-  └── HttpTaskServer (com.sun.net.httpserver)  ← ExecutorService (fixed pool, 8 потоков)
+  └── HttpTaskServer (com.sun.net.httpserver)  ← ExecutorService (fixed pool, 8)
         ├── /tasks        → TasksHandler
         ├── /subtasks     → SubtasksHandler
         ├── /epics        → EpicsHandler
         ├── /history      → HistoryHandler
-        └── /prioritized  → PrioritizedHandler
+        ├── /prioritized  → PrioritizedHandler
+        ├── /health       → HealthHandler
+        └── /version      → VersionHandler
                 │
                 ▼
         TaskManager (класс, потокобезопасный)
@@ -67,14 +69,15 @@ TaskTrackerApplication
 - `FileBackedTaskManager` удалён — заменён композицией `TaskManager(new CsvStorage(file))`.
 - Менеджер держит состояние в concurrent-коллекциях, все мутации — под единым локом.
 - Генерация id — монотонный счётчик `nextId`, без переиспользования удалённых id.
+- Пагинация, фильтры, сортировка — на уровне хендлеров, не в сервисе.
 
 Пакеты:
 
 | Пакет | Назначение |
 |---|---|
-| `config` | `AppConfig` — чтение env/sysprop |
+| `config` | `AppConfig` — чтение env/sysprop + версия |
 | `http` | `HttpTaskServer` |
-| `http.handler` | Хендлеры, `BaseHttpHandler` |
+| `http.handler` | Хендлеры, `BaseHttpHandler`, `QueryParams` |
 | `manage` | `ManagersUtil` |
 | `service` | `TaskManager`, `TaskViewHistory` |
 | `storage` | `TaskStorage`, `LoadedState`, `NoopStorage`, `CsvStorage` |
@@ -98,7 +101,16 @@ TaskTrackerApplication
 │   │   │   ├── config/AppConfig.java
 │   │   │   ├── exceptions/...
 │   │   │   ├── http/HttpTaskServer.java
-│   │   │   ├── http/handler/...  (Base + 5 хендлеров)
+│   │   │   ├── http/handler/
+│   │   │   │   ├── BaseHttpHandler.java
+│   │   │   │   ├── QueryParams.java
+│   │   │   │   ├── TasksHandler.java
+│   │   │   │   ├── SubtasksHandler.java
+│   │   │   │   ├── EpicsHandler.java
+│   │   │   │   ├── HistoryHandler.java
+│   │   │   │   ├── PrioritizedHandler.java
+│   │   │   │   ├── HealthHandler.java
+│   │   │   │   └── VersionHandler.java
 │   │   │   ├── manage/ManagersUtil.java
 │   │   │   ├── service/
 │   │   │   │   ├── TaskManager.java
@@ -132,32 +144,27 @@ TaskManager()                      // внутри new NoopStorage()
 TaskManager(TaskStorage storage)   // storage != null
 ```
 
-Приватные поля:
-- `int nextId` — монотонный счётчик id.
-- `final Set<Integer> allIdInWork` — `ConcurrentHashMap.newKeySet()`.
-- `final Map<Integer, Task> tasks`, `epics`, `subtasks` — `ConcurrentHashMap`.
-- `final NavigableSet<AbstractTask> prioritizedTasks` — `ConcurrentSkipListSet`.
-- `final TaskViewHistory historyManager`.
-- `final TaskStorage storage`.
-- `final Object lock` — единый лок для мутаций.
+Приватные поля: `int nextId`, `final Set<Integer> allIdInWork` (concurrent),
+`final Map<Integer, Task> tasks`, `epics`, `subtasks` (concurrent),
+`final NavigableSet<AbstractTask> prioritizedTasks` (concurrent),
+`final TaskViewHistory historyManager`, `final TaskStorage storage`,
+`final Object lock`.
 
-Приватные методы: `generateIdNumber()` (возвращает `int` через `nextId`),
-`addToPriorityList(AbstractTask)`, `initFromStorage()`, `persist()`,
-`verifyIntegrity()`.
+Приватные методы: `generateIdNumber()`, `addToPriorityList(AbstractTask)`,
+`initFromStorage()`, `persist()`, `verifyIntegrity()`.
 
-Публичные методы: те же сигнатуры, что в этапе 4 (см. git history).
+Публичные методы: `getPrioritizedTasks`, `isTimeIntersectBoth`,
+`isTimeIntersectWithOthers`, `getHistory`, `getTotalOfIdInWork`,
+`addTask`, `getTaskByIdNumber`, `removeTaskByIdNumber`, `updateTask`,
+`getAllTasks`, `removeAllTasks`, `addEpic`, `getEpicByIdNumber`,
+`removeEpicByIdNumber`, `updateEpicName`, `updateEpicDescription`,
+`getAllSubtasksFromEpic`, `getAllEpics`, `removeAllEpics`, `addSubtask`,
+`getSubtaskByIdNumber`, `removeSubtaskByIdNumber`, `updateSubtask`,
+`getAllSubtasks`, `removeAllSubtasks`.
 
-**Потокобезопасность:**
-- Все мутации — под `synchronized (lock)`.
-- Проверки, зависящие от общего состояния (уникальность id, пересечение
-  интервалов, наличие родителя), внутри лока.
-- Генерация id, изменения коллекций — внутри лока.
-- `persist()` — вне лока (I/O не держит блокировку).
-- Читающие методы — без лока (concurrent-коллекции).
-- Порядок захвата: сначала `lock`, затем монитор `TaskViewHistory`. Обратного
-  пути нет — deadlock исключён.
-
-**Javadoc на классе** описывает атомарность, персистенцию и порядок локов.
+**Потокобезопасность:** все мутации — под `synchronized (lock)`, `persist()`
+вне лока. Порядок захвата: `lock` → монитор `TaskViewHistory`. Deadlock исключён.
+Javadoc на классе описывает атомарность и персистенцию.
 
 ### `service.TaskViewHistory`
 
@@ -183,8 +190,9 @@ record LoadedState(Collection<Task> tasks, Collection<Epic> epics, Collection<Su
 
 ### `storage.NoopStorage` / `storage.CsvStorage`
 
-См. этап 4. `CsvStorage.save` сортирует по id, `load` пропускает битые
-строки с warn-логом.
+`CsvStorage.save` сортирует по id, `load` пропускает битые строки с warn-логом.
+Заголовок CSV: `id,type,name,description,statusProgress,parentEpic,childSubtasks,durationInMinutes,startDateTime,endDateTime`.
+Плейсхолдеры: `SKIP`, `EMPTY`.
 
 ### `manage.ManagersUtil`
 
@@ -198,9 +206,13 @@ static TaskManager getFileBacked(File)
 ### `config.AppConfig`
 
 ```
-static int getServerPort()
-static String getDataFilePath()
+static int getServerPort()      // env SERVER_PORT / -Dserver.port / 8080
+static String getDataFilePath() // env DATA_FILE / -Ddata.file / "tasks.csv"
+static String getVersion()      // "0.2.0"
 ```
+
+Версия — хардкод, в этапе 8 (инфраструктура) при подключении Maven resource
+filtering будет читаться из `pom.xml`.
 
 ### `LinkedHashMapCustom`
 
@@ -239,8 +251,16 @@ void start()   // log.info("HTTP server started on port {}", port)
 void stop()    // httpServer.stop(1); executor.shutdownNow() + awaitTermination(1s)
 ```
 
-Поля: `HttpServer`, `TaskManager`, `int port`, `ExecutorService executor` (fixed, 8).
 `THREAD_POOL_SIZE = 8`, `SHUTDOWN_TIMEOUT_SECONDS = 1`.
+Контексты: `/tasks`, `/subtasks`, `/epics`, `/history`, `/prioritized`,
+`/health`, `/version`.
+
+### `QueryParams` (record)
+
+```
+record QueryParams(int from, int size, StatusProgress status, String sortBy)
+static QueryParams defaults()  // from=0, size=20, status=null, sortBy="id"
+```
 
 ### `BaseHttpHandler`
 
@@ -249,15 +269,35 @@ void stop()    // httpServer.stop(1); executor.shutdownNow() + awaitTermination(
 `sendConflict` (409), `sendMethodNotAllowed` (405 + `Allow`),
 `sendUnsupportedMediaType` (415), `sendError` (500).
 
+**Пагинация:**
+```
+protected QueryParams parseQueryParams(HttpExchange httpExchange)
+protected Comparator<AbstractTask> comparatorFor(String sortBy)
+```
+
+`parseQueryParams` бросает `BadRequestException` (→ 400) при невалидных
+параметрах. Неизвестные параметры игнорируются. Не тримим — строгий контракт.
+`comparatorFor`: `"id"` → по `getIdNumber()`, `"startDateTime"` → по
+`getStartDateTime().orElse(LocalDateTime.MAX)` (задачи без времени в конце).
+
 ### Хендлеры
 
-**Общее:** POST создание → 201 + Location, обновление → 200 (кроме `EpicsHandler`
-— 400), DELETE → 204, неверный `Content-Type` → 415, неподдерживаемый метод → 405,
-пересечение интервалов → 409, пустой список → 200 + [].
+**Общее:** POST создание → 201 + Location, обновление → 200 (кроме
+`EpicsHandler` — 400), DELETE → 204, неверный `Content-Type` → 415,
+неподдерживаемый метод → 405 + `Allow`, пересечение интервалов → 409,
+пустой список → 200 + [].
+
+**`GET /tasks`, `GET /subtasks`, `GET /epics`:** пагинация через
+`parseQueryParams`, фильтр по `status`, сортировка через `comparatorFor`,
+`.skip(from).limit(size)`.
+
+**`GET /health`:** `200 {"status":"UP"}`. Только GET.
+**`GET /version`:** `200 {"version":"0.2.0"}`. Только GET.
 
 ### `CommaSeparatedValuesCreateProcess`
 
-Как в этапе 4.
+Как в этапе 4. `setFieldsFromStrings` проверяет `fields.length >= 10` и ловит
+`NumberFormatException`.
 
 ### Enums
 
@@ -271,79 +311,117 @@ void stop()    // httpServer.stop(1); executor.shutdownNow() + awaitTermination(
 ### Этапы 0-1-2 закрыты (PR #8, тег `v0.2-fixes`)
 
 Maven + wrapper, Maven-layout, `Main` → `TaskTrackerApplication`, logback.
-Баг-фиксы: NPE в `AbstractTask()`, `Epic.SubtaskFields` equals/hashCode,
+Баг-фиксы (NPE в `AbstractTask()`, `Epic.SubtaskFields` equals/hashCode,
 bounds-check в CSV, null-check в десериализаторе, `toString` в 4 классах,
-дедупликация `Subtask`, SLF4J. Code smells: `AppConfig`, убраны mutable-поля,
-сортировка CSV, удалён `DataForUserScenario`, `getAllSubtasksFromEpic` через данные
-эпика. Плюс: POST без `id` создаёт ресурс, NPE в `save` для файла без родителя.
+дедупликация `Subtask`, SLF4J). Code smells (`AppConfig`, убраны mutable-поля,
+сортировка CSV, удалён `DataForUserScenario`, `getAllSubtasksFromEpic` через
+данные эпика). Плюс: POST без `id` создаёт ресурс, NPE в `save` для файла без
+родителя.
 
 ### Этап 3 закрыт (PR #9, тег `v0.3-http`)
 
 HTTP-семантика: 201+Location на создание, 200 на update, 204 на delete,
-409 на пересечение, 415 на неверный Content-Type, 405 на метод, 200+[] на пустом
-списке. `sendHasInteractions` и `NOT_ACCEPTABLE` удалены в этапе 4.
+409 на пересечение, 415 на неверный Content-Type, 405 на метод, 200+[] на
+пустом списке.
 
 ### Этап 4 закрыт (PR #10, тег `v0.4-storage`)
 
 `TaskStorage` + `LoadedState`, `NoopStorage` + `CsvStorage`.
 `InMemoryTaskManager` → `TaskManager`, `InMemoryHistoryManager` → `TaskViewHistory`.
 `FileBackedTaskManager` удалён. Интерфейсы `TaskManager` и `HistoryManager` удалены.
-`initFromStorage()` + `verifyIntegrity()` (warn + удаление orphan-подзадач).
-Тесты: `FileBackedTaskManagerTest` и `InMemoryTaskManagerTest` удалены,
-`TaskManagerTest` и `TaskViewHistoryTest` в `service`.
+`initFromStorage()` + `verifyIntegrity()`.
 
-### Этап 5 закрыт (ветка `develop-stage-5-concurrency`, ждёт merge)
+### Этап 5 закрыт (PR #11, тег `v0.5-concurrency`)
 
-- **Генерация id:** монотонный `nextId`, без переиспользования. Убраны
-  `counterForIdNumber` и `isRestarted`. `initFromStorage` восстанавливает
-  `nextId = max(existing ids)`. Пользовательские id (заданные вручную) —
-  `nextId = max(nextId, id)`.
-- **Concurrent-коллекции:** `ConcurrentHashMap` для `tasks`/`epics`/`subtasks`,
-  `ConcurrentHashMap.newKeySet()` для `allIdInWork`, `ConcurrentSkipListSet` для
-  `prioritizedTasks`.
-- **Единый лок `private final Object lock`:** все мутационные методы обёрнуты
-  в `synchronized (lock)`. Проверки, зависящие от общего состояния, — под локом.
-  `persist()` — вне лока.
-- **`TaskViewHistory`:** методы `addRecord`/`removeRecord`/`getHistory` —
-  `synchronized`. Порядок локов: `TaskManager.lock` → монитор истории.
-- **Javadoc на `TaskManager`** — атомарность, персистенция, порядок захвата локов,
-  исключение deadlock.
-- **`HttpTaskServer`:** явный `ExecutorService` (`newFixedThreadPool(8)`),
-  `setExecutor`, в `stop()` — `shutdownNow()` + `awaitTermination(1s)`.
-- **Тест `TaskManagerConcurrencyTest`:** 16 потоков × 50 задач = 800 параллельных
-  `addTask`. Проверяет: все SUCCESS, все 800 задач в менеджере, все id уникальны.
+Генерация id: монотонный `nextId`, без переиспользования. Concurrent-коллекции.
+Единый лок `Object lock` для всех мутаций, `persist()` вне лока. `TaskViewHistory`
+— методы `synchronized`. Javadoc на `TaskManager`. `HttpTaskServer` —
+`ExecutorService` (8 потоков), `shutdownNow` в `stop()`. Тест
+`TaskManagerConcurrencyTest` (16×50 = 800 параллельных `addTask`).
 
-**Тестов:** 103 (BUILD SUCCESS).
+### Этап 6 закрыт (ветка `develop-stage-6-api`, ждёт merge)
+
+- **Пагинация** для `GET /tasks | /subtasks | /epics`:
+  `?from=0&size=20&status=NEW&sortBy=startDateTime`.
+  `from ≥ 0`, `size 1..100` (дефолт 20), `status` — enum или null,
+  `sortBy` — `id` (дефолт) или `startDateTime`.
+- **`QueryParams`** record + `parseQueryParams` + `comparatorFor` в `BaseHttpHandler`.
+- **Невалидные параметры** → 400 с сообщением про конкретный параметр.
+  Неизвестные параметры игнорируются. Не тримим — строгий контракт.
+- **`GET /health`** → `{"status":"UP"}`.
+- **`GET /version`** → `{"version":"0.2.0"}`. Версия — хардкод в `AppConfig.getVersion()`.
+- **Тесты:** 12 тестов пагинации (по 3 на ресурс: happy path / фильтр / сортировка / дефолт;
+  6 тестов валидации на `/tasks`; +4 теста на `/health` и `/version`).
+- **`docs/openapi.yaml`** — решили не делать. Спецификация вручную, быстро устаревает.
+- **Версионирование `/api/v1/...`** — не делаем.
+
+**Тестов:** 119 (BUILD SUCCESS).
 
 ## Что делаем сейчас
 
-**Активный этап:** Этап 6 — расширение API (опционально).
-**Ветка:** будет `develop-stage-6-api` (создать от main после merge).
+**Активный этап:** Этап 7 — переработка тестов.
+**Ветка:** будет `develop-stage-7-tests` (создать от main после merge этапа 6).
 
-### Этап 6 — план (все пункты опциональны)
+### Этап 7 — план
 
-1. **Пагинация** для `GET /tasks | /subtasks | /epics`:
-   `?from=0&size=20&status=NEW&sortBy=startDateTime`.
-   Реализация: фильтрация + сортировка + пагинация в стриме.
-2. **`GET /health`** → `200 {"status":"UP"}`.
-3. **`GET /version`** → `200 {"version":"0.2.0"}`.
-4. **`docs/openapi.yaml`** — ручная спека, без UI.
-5. Версионирование `/api/v1/...` — **НЕ ДЕЛАЕМ** (ломает текущие URL).
+**Общие принципы:**
+- `assertThrows` — только с конкретными типами исключений, не `RuntimeException`.
+- Убрать все `System.out.println` из тестов.
+- Детерминированное время — `LocalDateTime.of(...)` вместо `now()`.
+- `@AfterEach` для очистки temp-файлов.
+- HTTP-тесты — на порту 0 (свободный от ОС), не хардкод 8080.
+- Проверять тело ответа, а не только статус-код, где осмысленно.
+
+**Конкретные задачи:**
+1. **`TaskManagerTest`:**
+    - `assertThrows(NotFoundException.class, ...)` вместо `RuntimeException`.
+    - Убрать `System.out.println`.
+    - `LocalDateTime.of` вместо `now()` в тестах приоритетов и пересечений.
+    - Добавить тесты на пересчёт полей `Epic` (duration/start/end/status) —
+      сейчас нет или слабо покрыто.
+    - Тесты на `hashCode` везде, где есть `equals`.
+2. **`TaskViewHistoryTest`** — уже отвязан от `TaskManagerTest`, но добавить
+   проверки фактического порядка после удаления (`removeRecord_First/Middle/Last`
+   сейчас проверяют только `SUCCESS`).
+3. **`LinkedHashMapCustomTest`** — проверить возврат копий, а не ссылок.
+4. **`HttpTaskServerTest`:**
+    - Порт 0 (`InetSocketAddress(0)` + `getAddress().getPort()`), не хардкод 8080.
+    - Один `HttpServer` на класс, не на тест (сейчас `start()`/`stop()` на каждом).
+    - `@AfterEach` — закрывать executor.
+    - Проверять тела ответов в тестах ошибок (сейчас часто только код).
+    - Заменить `.replace("NEW", "something")` на явный невалидный JSON —
+      `replace` может заменить лишнее.
+5. **Новые тесты:**
+    - `CsvStorageTest` — прямое тестирование save/load, битые строки, отсутствие
+      файла, read-only. Взамен удалённого `FileBackedTaskManagerTest`.
+    - Прямые тесты CSV-парсера (`CommaSeparatedValuesCreateProcess.toString` /
+      `getXFromStrings`).
+    - Тесты Gson-адаптеров (`LocalDateTimeTypeAdapter`, `DurationTypeAdapter`,
+      `AbstractTaskDeserializer` — в т.ч. отсутствующий `type`).
+    - Тесты на потерянные ветки `ResultOfOperation`.
+6. **Параметризованные тесты:**
+    - Эпик: набор статусов подзадач → статус эпика (7+ кейсов в один
+      `@ParameterizedTest`).
+    - Пересечение интервалов: 8–10 наборов (касание, вложение, полное совпадение).
+7. **`catch_Exception_When_Save_File_Read_Only_Test`** — судьба (нестабилен
+   на Windows): либо `@DisabledOnOs(OS.WINDOWS)`, либо удалить, либо заменить
+   другим способом эмулировать read-only.
 
 ### Открытые мелочи
 
-- `isTimeIntersectBoth` и `isTimeIntersectWithOthers` — пока `public`, нужны
-  тестам. Станут `private` в этапе 7, если тесты переедут/изменятся.
-- `getTotalOfIdInWork` — `public`, нужен одному тесту.
+- `isTimeIntersectBoth` и `isTimeIntersectWithOthers` в `TaskManager` — public,
+  нужны тестам. В этапе 7 — либо оставить (тесты), либо package-private +
+  перенести тесты в `service`.
+- `getTotalOfIdInWork` — public, нужен одному тесту.
 - `service/interfaces/` — директория опустела, можно удалить.
-- В тестах всё ещё есть `System.out.println` — убираются в этапе 7.
+- В `pom.xml` версия `0.2.0-SNAPSHOT` и `AppConfig.getVersion()` `"0.2.0"` —
+  две правды. Синхронизировать в этапе 8 (через Maven resource filtering).
 
 ### Дальнейшие этапы
 
-- **Этап 7 (тесты):** переработка — конкретные исключения, детерминированное время,
-  порт 0, `@AfterEach`, тела ответов, разделение на contract/integration.
 - **Этап 8 (инфраструктура, опционально):** Checkstyle, SpotBugs, JaCoCo,
-  GitHub Actions, Dockerfile, docker-compose.
+  GitHub Actions, Dockerfile, docker-compose, синхронизация версии через
+  Maven resource filtering.
 
 ## Принятые решения
 
@@ -362,6 +440,10 @@ HTTP-семантика: 201+Location на создание, 200 на update, 20
 | 11 | Потокобезопасность: `ConcurrentHashMap` + единый `synchronized (lock)` |
 | 12 | Менеджер без интерфейса; полиморфизм на `TaskStorage` |
 | 13 | Генерация id: монотонный счётчик, без переиспользования |
+| 14 | Пагинация на уровне хендлеров, не в сервисе |
+| 15 | `QueryParams` — record (4 параметра) |
+| 16 | Контракт API строгий: не тримим параметры |
+| 17 | OpenAPI-спека и версионирование `/api/v1/` — не делаем |
 
 ## Модель ветвления и тегов
 
@@ -369,10 +451,9 @@ HTTP-семантика: 201+Location на создание, 200 на update, 20
 - Каждый этап — своя ветка `develop-stage-X-...`.
 - После этапа: PR на GitHub (base `main`), merge commit, тег на merge-коммит.
 
-**Теги:**
-- `v0.1-before-refactor`, `v0.2-fixes`, `v0.3-http`, `v0.4-storage` — на main.
-- `v0.5-concurrency` — после merge текущей ветки.
-- `v0.6-api`, `v0.7-tests`, `v1.0-portfolio` — в будущем.
+**Теги:** `v0.1-before-refactor`, `v0.2-fixes`, `v0.3-http`, `v0.4-storage`,
+`v0.5-concurrency` — на main. `v0.6-api` — после merge текущей ветки.
+`v0.7-tests`, `v1.0-portfolio` — в будущем.
 
 ## Соглашения по коду и тестам
 
@@ -392,37 +473,25 @@ HTTP-семантика: 201+Location на создание, 200 на update, 20
 - Пути в bash — прямые слэши: `git add src/main`, не `src\main`.
 - В Surefire прописан `argLine` с UTF-8. При запуске из IDEA-панели —
   `JAVA_TOOL_OPTIONS` в `Settings → Build → Build Tools → Maven → Runner`.
-- `mvn clean` может падать с `Failed to delete target` — файл-лок на Windows.
-  Лечится закрытием IDEA и `rm -rf target`.
+- `mvn clean` может падать с `Failed to delete target` — файл-лок на Windows
+  (IDEA, антивирус, проводник). Лечится закрытием IDEA и `rm -rf target`.
 - `.gitattributes` нормализует `.java` в LF. Warning про CRLF — нормально.
 - `idNumber = -1` — маркер «пустышка». Gson даёт `-1` при POST без `id`;
   хендлеры нормализуют в `0` в ветке создания.
-
-### IDEA: тесты не запускаются через кнопку Run, но `./mvnw test` работает
-
-Симптом: при запуске отдельного теста из IDEA — `package org.junit.jupiter.api does not exist`.
-Через `./mvnw clean test` всё зелёно.
-
-Причина: IDEA использует свой native build system, а не Maven. После крупных
-изменений в `pom.xml` или перекладки исходников IDEA может потерять classpath.
-
-**Решение, которое сработало:**
-1. В правой панели Maven → правый клик по корневому проекту → **Unlink Maven Projects**.
-2. Правый клик по `pom.xml` → **Add as Maven Project**.
-
-Альтернативы (не помогли в этом случае, но помогают обычно):
-- **Reload All Maven Projects** (кнопка в панели Maven).
-- Проверить `Settings → Build → Build Tools → Maven → Ignored Files` — не
-  должен быть отмечен `pom.xml`.
-- `Settings → Build → Build Tools → Maven → Runner → Delegate IDE build/run actions to Maven`.
-- В крайнем случае — удалить `.idea/` и `*.iml`, открыть заново через `pom.xml`.
-
-### IDEA: Compact Middle Packages
-
-Чтобы дерево проекта не разъезжалось «лесенкой» (`ru → yandex → practicum → java → tasktracker`),
-включить **Compact Middle Packages**. Путь в новых версиях:
-`File → Settings → Advanced Settings → Project View → Compact Middle Packages`.
-В контекстном меню правого клика по папке этого пункта может не быть.
+- **Пересечение интервалов включает касание границ.** `t1.end == t2.start`
+  считается пересечением. В тестах с массовым добавлением задач нужен
+  достаточный шаг между `startDateTime` (например, шаг 20 мин при duration 10).
+- **IDEA: тесты не запускаются через кнопку Run, а `./mvnw test` работает.**
+  Симптом: `package org.junit.jupiter.api does not exist`. Причина: IDEA
+  использует свой native build system, не Maven. Решение: Maven-панель →
+  правый клик по корню → **Unlink Maven Projects**, затем правый клик по
+  `pom.xml` → **Add as Maven Project**.
+- **IDEA: Compact Middle Packages** — включить, чтобы дерево не разъезжалось.
+  Путь: `File → Settings → Advanced Settings → Project View → Compact Middle Packages`.
+- **Бэкап проекта:** PowerShell-скрипт `backup-javaProject.ps1` — зеркалирование
+  `G:\javaProject` на флешку с меткой `BACKUP` через `robocopy /MIR`. Скрипт
+  требует **UTF-8 with BOM** (иначе PowerShell 5.1 ломает кириллицу).
+  Автоопределение флешки через `Get-Volume | Where FileSystemLabel -eq 'BACKUP'`.
 
 ## Ожидаемое действие от ассистента в новом чате
 

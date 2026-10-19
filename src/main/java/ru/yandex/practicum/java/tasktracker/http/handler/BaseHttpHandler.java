@@ -3,8 +3,10 @@ package ru.yandex.practicum.java.tasktracker.http.handler;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.sun.net.httpserver.HttpExchange;
+import ru.yandex.practicum.java.tasktracker.exceptions.BadRequestException;
 import ru.yandex.practicum.java.tasktracker.utils.AbstractTask;
 import ru.yandex.practicum.java.tasktracker.utils.enums.HttpResponseCode;
+import ru.yandex.practicum.java.tasktracker.utils.enums.StatusProgress;
 import ru.yandex.practicum.java.tasktracker.utils.gson.AbstractTaskDeserializer;
 import ru.yandex.practicum.java.tasktracker.utils.gson.DurationTypeAdapter;
 import ru.yandex.practicum.java.tasktracker.utils.gson.LocalDateTimeTypeAdapter;
@@ -15,6 +17,9 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Map;
 
 public class BaseHttpHandler {
     protected static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
@@ -86,5 +91,69 @@ public class BaseHttpHandler {
             os.write(response);
         }
         httpExchange.close();
+    }
+
+    protected QueryParams parseQueryParams(HttpExchange httpExchange) {
+        String rawQuery = httpExchange.getRequestURI().getQuery();
+        if (rawQuery == null || rawQuery.isBlank()) {
+            return QueryParams.defaults();
+        }
+
+        Map<String, String> params = new HashMap<>();
+        for (String pair : rawQuery.split("&")) {
+            String[] parts = pair.split("=", 2);
+            if (parts.length == 2) {
+                params.put(parts[0], parts[1]);
+            }
+        }
+
+        int from = parseIntParam(params, "from", 0);
+        int size = parseIntParam(params, "size", 20);
+
+        if (from < 0) {
+            throw new BadRequestException("'from' must be >= 0");
+        }
+        if (size < 1 || size > 100) {
+            throw new BadRequestException("'size' must be between 1 and 100");
+        }
+
+        StatusProgress status = parseStatus(params.get("status"));
+        String sortBy = params.getOrDefault("sortBy", "id");
+        if (!"id".equals(sortBy) && !"startDateTime".equals(sortBy)) {
+            throw new BadRequestException("'sortBy' must be 'id' or 'startDateTime'");
+        }
+
+        return new QueryParams(from, size, status, sortBy);
+    }
+
+    protected Comparator<AbstractTask> comparatorFor(String sortBy) {
+        if ("startDateTime".equals(sortBy)) {
+            return Comparator.comparing(
+                    task -> task.getStartDateTime().orElse(LocalDateTime.MAX));
+        }
+        return Comparator.comparingInt(AbstractTask::getIdNumber);
+    }
+
+    private int parseIntParam(Map<String, String> params, String name, int defaultValue) {
+        String value = params.get(name);
+        if (value == null) {
+            return defaultValue;
+        }
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException exception) {
+            throw new BadRequestException("'" + name + "' must be an integer, got: '" + value + "'");
+        }
+    }
+
+    private StatusProgress parseStatus(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return StatusProgress.valueOf(value);
+        } catch (IllegalArgumentException exception) {
+            throw new BadRequestException("'status' must be one of: NEW, IN_PROGRESS, DONE; got: '" + value + "'");
+        }
     }
 }

@@ -39,4 +39,8 @@ public final class AppConfig {
                     "Invalid integer value for " + envName + "/" + sysPropName + ": " + value, exception);
         }
     }
+
+    public static String getVersion() {
+        return "0.2.0";
+    }
 }

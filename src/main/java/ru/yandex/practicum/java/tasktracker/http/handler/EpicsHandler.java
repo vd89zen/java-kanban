@@ -11,6 +11,7 @@ import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
 import ru.yandex.practicum.java.tasktracker.service.TaskManager;
 import java.io.IOException;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
 
@@ -93,7 +94,15 @@ public class EpicsHandler extends BaseHttpHandler implements HttpHandler {
 
             if (requestMethod.equals("GET")) {
                 if (splitPath.length == 2) {
-                    sendText(httpExchange, gson.toJson(taskManager.getAllEpics()));
+                    QueryParams params = parseQueryParams(httpExchange);
+                    List<Epic> result = taskManager.getAllEpics().stream()
+                            .filter(epic -> params.status() == null
+                                    || epic.getStatusProgress() == params.status())
+                            .sorted(comparatorFor(params.sortBy()))
+                            .skip(params.from())
+                            .limit(params.size())
+                            .collect(Collectors.toList());
+                    sendText(httpExchange, gson.toJson(result));
                 } else if (splitPath.length == 3) {
                     int id;
                     try {
