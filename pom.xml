@@ -18,12 +18,12 @@
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-
         <gson.version>2.11.0</gson.version>
         <slf4j.version>2.0.13</slf4j.version>
         <logback.version>1.5.6</logback.version>
         <junit.version>5.10.2</junit.version>
         <main.class>ru.yandex.practicum.java.tasktracker.TaskTrackerApplication</main.class>
+        <argLine></argLine>
     </properties>
 
     <dependencies>
@@ -125,8 +125,29 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
                 <configuration>
-                    <argLine>-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8</argLine>
+                    <argLine>@{argLine} -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8</argLine>
                 </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.12</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
 
             <plugin>
