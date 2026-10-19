@@ -6,8 +6,11 @@ import org.junit.jupiter.api.Test;
 import ru.yandex.practicum.java.tasktracker.task.Epic;
 import ru.yandex.practicum.java.tasktracker.task.Subtask;
 import ru.yandex.practicum.java.tasktracker.task.Task;
+import ru.yandex.practicum.java.tasktracker.utils.AbstractTask;
 import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
 import ru.yandex.practicum.java.tasktracker.utils.enums.StatusProgress;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -41,6 +44,12 @@ class TaskViewHistoryTest {
         subtask1 = new Subtask(SUBTASK_1_ID, "subtask1", DESCRIPTION, StatusProgress.NEW, EPIC_1_ID);
         subtask2 = new Subtask(SUBTASK_2_ID, "subtask2", DESCRIPTION, StatusProgress.NEW, EPIC_1_ID);
         subtask3 = new Subtask(SUBTASK_3_ID, "subtask3", DESCRIPTION, StatusProgress.NEW, EPIC_1_ID);
+    }
+
+    private List<Integer> getHistoryIds() {
+        return history.getHistory().stream()
+                .map(AbstractTask::getIdNumber)
+                .toList();
     }
 
     @Test
@@ -90,24 +99,22 @@ class TaskViewHistoryTest {
     }
 
     @Test
-    @DisplayName("Проверяем отсутствие дублей в истории")
+    @DisplayName("Проверяем, что повторное добавление перемещает задачу в конец истории")
     void addRecord_Same_Task_Twice_Test() {
         //Given
-        int expectedSize = 1;
         history.addRecord(task1);
-        task1.setStatusProgress(StatusProgress.DONE);
+        history.addRecord(task2);
+        history.addRecord(epic1);
         //When
         history.addRecord(task1);
-        int actualSize = history.getHistory().size();
         //Then
-        assertEquals(expectedSize, actualSize);
+        assertEquals(List.of(TASK_2_ID, EPIC_1_ID, TASK_1_ID), getHistoryIds());
     }
 
     @Test
     @DisplayName("Проверяем удаление из истории записи в начале списка")
     void removeRecord_First_Test() {
         //Given
-        ResultOfOperation expectedResult = ResultOfOperation.SUCCESS;
         history.addRecord(task1);
         history.addRecord(task2);
         history.addRecord(epic1);
@@ -118,15 +125,16 @@ class TaskViewHistoryTest {
         //When
         ResultOfOperation actualResult = history.removeRecord(TASK_1_ID);
         //Then
-        assertEquals(expectedResult, actualResult);
-        assertEquals(6, history.getHistory().size());
+        assertEquals(ResultOfOperation.SUCCESS, actualResult);
+        assertEquals(
+                List.of(TASK_2_ID, EPIC_1_ID, EPIC_2_ID, SUBTASK_1_ID, SUBTASK_2_ID, SUBTASK_3_ID),
+                getHistoryIds());
     }
 
     @Test
     @DisplayName("Проверяем удаление из истории записи в середине списка")
     void removeRecord_Middle_Test() {
         //Given
-        ResultOfOperation expectedResult = ResultOfOperation.SUCCESS;
         history.addRecord(task1);
         history.addRecord(task2);
         history.addRecord(epic1);
@@ -137,15 +145,16 @@ class TaskViewHistoryTest {
         //When
         ResultOfOperation actualResult = history.removeRecord(EPIC_2_ID);
         //Then
-        assertEquals(expectedResult, actualResult);
-        assertEquals(6, history.getHistory().size());
+        assertEquals(ResultOfOperation.SUCCESS, actualResult);
+        assertEquals(
+                List.of(TASK_1_ID, TASK_2_ID, EPIC_1_ID, SUBTASK_1_ID, SUBTASK_2_ID, SUBTASK_3_ID),
+                getHistoryIds());
     }
 
     @Test
     @DisplayName("Проверяем удаление из истории записи в конце списка")
     void removeRecord_Last_Test() {
         //Given
-        ResultOfOperation expectedResult = ResultOfOperation.SUCCESS;
         history.addRecord(task1);
         history.addRecord(task2);
         history.addRecord(epic1);
@@ -156,7 +165,9 @@ class TaskViewHistoryTest {
         //When
         ResultOfOperation actualResult = history.removeRecord(SUBTASK_3_ID);
         //Then
-        assertEquals(expectedResult, actualResult);
-        assertEquals(6, history.getHistory().size());
+        assertEquals(ResultOfOperation.SUCCESS, actualResult);
+        assertEquals(
+                List.of(TASK_1_ID, TASK_2_ID, EPIC_1_ID, EPIC_2_ID, SUBTASK_1_ID, SUBTASK_2_ID),
+                getHistoryIds());
     }
 }

@@ -1,9 +1,15 @@
 package ru.yandex.practicum.java.tasktracker.service;
 
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import ru.yandex.practicum.java.tasktracker.exceptions.NotFoundException;
 import ru.yandex.practicum.java.tasktracker.task.*;
 import ru.yandex.practicum.java.tasktracker.utils.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.stream.Stream;
+
 import org.junit.jupiter.api.*;
 import ru.yandex.practicum.java.tasktracker.utils.enums.ResultOfOperation;
 import ru.yandex.practicum.java.tasktracker.utils.enums.StatusProgress;
@@ -92,12 +98,8 @@ class TaskManagerTest {
             //Given
             expectedResult = ResultOfOperation.SUCCESS;
             Task testTask = new Task("testTask", DESCRIPTION, StatusProgress.NEW);
-            System.out.println("\nTasks BEFORE test 'Проверяем добавение Task без заданного ID':");
-            System.out.println(taskManager.getAllTasks());
             //When
             actualResult = taskManager.addTask(testTask);
-            System.out.println("\nTasks AFTER test 'Проверяем добавение Task без заданного ID':");
-            System.out.println(taskManager.getAllTasks());
             //Then
             assertEquals(expectedResult, actualResult);
         }
@@ -109,12 +111,8 @@ class TaskManagerTest {
             expectedResult = ResultOfOperation.SUCCESS;
             Integer setIdNumber = 888;
             Task testTask888 = new Task(setIdNumber, "testTask888", DESCRIPTION, StatusProgress.NEW);
-            System.out.println("\nTasks BEFORE test 'Проверяем добавление Task с заданным ID':");
-            System.out.println(taskManager.getAllTasks());
             //When
             actualResult = taskManager.addTask(testTask888);
-            System.out.println("\nTasks AFTER test 'Проверяем добавление Task с заданным ID':");
-            System.out.println(taskManager.getAllTasks());
             //Then
             assertEquals(expectedResult, actualResult);
         }
@@ -136,16 +134,10 @@ class TaskManagerTest {
         void addTask_With_IdNumber_Deleted_Task_Test() {
             //Given
             expectedResult = ResultOfOperation.SUCCESS;
-            System.out.println("\nTasks BEFORE test 'Проверяем добавление Task c ID ранее удалённой Task':");
-            System.out.println(taskManager.getAllTasks());
-            System.out.println("taskManager.removeTaskForIdNumber(BASE_TASK_2_ID): " +
-                    taskManager.removeTaskByIdNumber(BASE_TASK_2_ID));
-            System.out.println(taskManager.getAllTasks());
+            taskManager.removeTaskByIdNumber(BASE_TASK_2_ID);
             //When
             Task testTask5 = new Task(BASE_TASK_2_ID, "testTask5", DESCRIPTION, StatusProgress.NEW);
             actualResult = taskManager.addTask(testTask5);
-            System.out.println("\nTasks AFTER test 'Проверяем добавление Task c ID ранее удалённой Task':");
-            System.out.println(taskManager.getAllTasks());
             //Then
             assertEquals(expectedResult, actualResult);
         }
@@ -167,7 +159,7 @@ class TaskManagerTest {
             //Given
             Integer notExistsIdNumber = 666;
             //When, Then
-            assertThrows(RuntimeException.class, () -> taskManager.getTaskByIdNumber(notExistsIdNumber));
+            assertThrows(NotFoundException.class, () -> taskManager.getTaskByIdNumber(notExistsIdNumber));
         }
 
         @Test
@@ -178,15 +170,11 @@ class TaskManagerTest {
             String oldName = "testTask";
             Task testTaskUPD = new Task(oldName, DESCRIPTION, StatusProgress.NEW);
             taskManager.addTask(testTaskUPD);
-            System.out.println("\nTasks BEFORE test 'Проверяем обновление Task':");
-            System.out.println(taskManager.getAllTasks());
             testTaskUPD = taskManager.getTaskByIdNumber(testTaskUPD.getIdNumber());
             //When
             testTaskUPD.setName(expectedName);
             taskManager.updateTask(testTaskUPD);
             String actualName = taskManager.getTaskByIdNumber(testTaskUPD.getIdNumber()).getName().get();
-            System.out.println("\nTasks AFTER test 'Проверяем обновление Task':");
-            System.out.println(taskManager.getAllTasks());
             //Then
             assertEquals(expectedName, actualName);
         }
@@ -195,14 +183,10 @@ class TaskManagerTest {
         @DisplayName("Проверяем удаление существующей Task по ID")
         void removeTaskForIdNumber_Test() {
             //Given
-            System.out.println("\nTasks BEFORE test 'Проверяем удаление существующей Task по ID':");
-            System.out.println(taskManager.getAllTasks());
             //When
             taskManager.removeTaskByIdNumber(BASE_TASK_1_ID);
             //Then
-            System.out.println("\nTasks AFTER test 'Проверяем удаление существующей Task по ID':");
-            System.out.println(taskManager.getAllTasks());
-            assertThrows(RuntimeException.class, () -> taskManager.getTaskByIdNumber(BASE_TASK_1_ID));
+            assertThrows(NotFoundException.class, () -> taskManager.getTaskByIdNumber(BASE_TASK_1_ID));
         }
 
         @Test
@@ -237,15 +221,38 @@ class TaskManagerTest {
             String newName = "testTaskNEW";
             Task testTaskImmutability = new Task(expectedName, DESCRIPTION, StatusProgress.NEW);
             taskManager.addTask(testTaskImmutability);
-            System.out.println("\nTasks BEFORE test 'Проверяем, что Task не меняется в Менеджере без вызова метода 'updateTask'':");
-            System.out.println(taskManager.getAllTasks());
             //When
             testTaskImmutability.setName(newName);
             String actualName = taskManager.getTaskByIdNumber(testTaskImmutability.getIdNumber()).getName().get();
-            System.out.println("\nTasks AFTER test 'Проверяем, что Task не меняется в Менеджере без вызова метода 'updateTask'':");
-            System.out.println(taskManager.getAllTasks());
             //Then
             assertEquals(expectedName, actualName);
+        }
+
+        @Test
+        @DisplayName("hashCode двух Task с одинаковыми полями совпадает")
+        void task_HashCode_EqualObjects_Test() {
+            //Given
+            Task t1 = new Task(BASE_TASK_1_ID, "n", DESCRIPTION, StatusProgress.NEW);
+            Task t2 = new Task(BASE_TASK_1_ID, "n", DESCRIPTION, StatusProgress.NEW);
+            //When
+            boolean equalsResult = t1.equals(t2);
+            int hashCode1 = t1.hashCode();
+            int hashCode2 = t2.hashCode();
+            //Then
+            assertTrue(equalsResult, "Объекты должны быть равны");
+            assertEquals(hashCode1, hashCode2, "У равных объектов hashCode должен совпадать");
+        }
+
+        @Test
+        @DisplayName("hashCode Task стабилен при повторном вызове")
+        void task_HashCode_IsStable_Test() {
+            //Given
+            Task task = new Task(BASE_TASK_1_ID, "n", DESCRIPTION, StatusProgress.NEW);
+            //When
+            int first = task.hashCode();
+            int second = task.hashCode();
+            //Then
+            assertEquals(first, second, "hashCode не должен меняться между вызовами");
         }
     }
 
@@ -258,12 +265,8 @@ class TaskManagerTest {
             //Given
             expectedResult = ResultOfOperation.SUCCESS;
             Epic testEpic = new Epic("testEpic", DESCRIPTION);
-            System.out.println("\nEpics BEFORE test 'Проверяем добавление Epic без заданного ID':");
-            System.out.println(taskManager.getAllEpics());
             //When
             actualResult = taskManager.addEpic(testEpic);
-            System.out.println("\nEpics AFTER test 'Проверяем добавление Epic без заданного ID':");
-            System.out.println(taskManager.getAllEpics());
             //Then
             assertEquals(expectedResult, actualResult);
         }
@@ -297,138 +300,22 @@ class TaskManagerTest {
             //Given
             StatusProgress expectedStatusProgress = StatusProgress.DONE;
             String messageIfFail = "Если подазадчи DONE, эпик должен быть DONE";
-            System.out.println("\nEpic/Subtasks BEFORE test 'Проверяем изменение статуса Epic после обновления Subtask с измененным статусом':");
-            System.out.println(taskManager.getAllEpics());
-            System.out.println(taskManager.getAllSubtasks());
             //When
             baseSubtask1.setStatusProgress(StatusProgress.DONE);
             taskManager.updateSubtask(baseSubtask1);
             StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_1_ID).getStatusProgress();
-            System.out.println("\nEpic/Subtasks AFTER test 'Проверяем изменение статуса Epic после обновления Subtask с измененным статусом':");
-            System.out.println(taskManager.getAllEpics());
-            System.out.println(taskManager.getAllSubtasks());
             //Then
             assertEquals(expectedStatusProgress, actualStatusProgress, messageIfFail);
-        }
-
-        @Test
-        @DisplayName("Проверяем что статус Epic NEW, когда статус всех Subtasks NEW")
-        void epic_Check_Status_Progress_When_All_Subtasks_NEW_Test(){
-            //Given
-            StatusProgress expectedStatusProgress = StatusProgress.NEW;
-            System.out.println("\nПроверяем что статус Epic NEW, когда статус всех Subtasks NEW");
-            //When
-            System.out.println(taskManager.getAllEpics());
-            System.out.println(taskManager.getAllSubtasks());
-            StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_2_ID).getStatusProgress();
-            //Then
-            assertEquals(expectedStatusProgress, actualStatusProgress);
-        }
-
-        @Test
-        @DisplayName("Проверяем что статус Epic IN_PROGRESS, когда статус всех Subtasks IN_PROGRESS")
-        void epic_Check_Status_Progress_When_All_Subtasks_IN_PROGRESS_Test(){
-            //Given
-            StatusProgress expectedStatusProgress = StatusProgress.IN_PROGRESS;
-            System.out.println("\nПроверяем что статус Epic IN_PROGRESS, когда статус всех Subtasks IN_PROGRESS");
-            baseSubtask2.setStatusProgress(StatusProgress.IN_PROGRESS);
-            baseSubtask3.setStatusProgress(StatusProgress.IN_PROGRESS);
-            taskManager.updateSubtask(baseSubtask2);
-            taskManager.updateSubtask(baseSubtask3);
-            //When
-            System.out.println(taskManager.getAllEpics());
-            System.out.println(taskManager.getAllSubtasks());
-            StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_2_ID).getStatusProgress();
-            //Then
-            assertEquals(expectedStatusProgress, actualStatusProgress);
-        }
-
-        @Test
-        @DisplayName("Проверяем что статус Epic DONE, когда статус всех Subtasks DONE")
-        void epic_Check_Status_Progress_When_All_Subtasks_DONE_Test(){
-            //Given
-            StatusProgress expectedStatusProgress = StatusProgress.DONE;
-            System.out.println("\nПроверяем что статус DONE, когда статус всех Subtasks DONE");
-            baseSubtask2.setStatusProgress(StatusProgress.DONE);
-            baseSubtask3.setStatusProgress(StatusProgress.DONE);
-            taskManager.updateSubtask(baseSubtask2);
-            taskManager.updateSubtask(baseSubtask3);
-            //When
-            System.out.println(taskManager.getAllEpics());
-            System.out.println(taskManager.getAllSubtasks());
-            StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_2_ID).getStatusProgress();
-            //Then
-            assertEquals(expectedStatusProgress, actualStatusProgress);
-        }
-
-        @Test
-        @DisplayName("Проверяем что статус Epic IN_PROGRESS, когда статус Subtasks NEW and DONE")
-        void epic_Check_Status_Progress_When_Subtasks_NEW_And_DONE_Test(){
-            //Given
-            StatusProgress expectedStatusProgress = StatusProgress.IN_PROGRESS;
-            System.out.println("\nПроверяем что статус IN_PROGRESS, когда статус Subtasks NEW and DONE");
-            baseSubtask3.setStatusProgress(StatusProgress.DONE);
-            taskManager.updateSubtask(baseSubtask3);
-            //When
-            System.out.println(taskManager.getAllEpics());
-            System.out.println(taskManager.getAllSubtasks());
-            StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_2_ID).getStatusProgress();
-            //Then
-            assertEquals(expectedStatusProgress, actualStatusProgress);
-        }
-
-        @Test
-        @DisplayName("Проверяем что статус Epic IN_PROGRESS, когда статус Subtasks NEW, IN_PROGRESS, DONE")
-        void epic_Check_Status_Progress_When_Subtasks_NEW_INPROGRESS_DONE_Test(){
-            //Given
-            StatusProgress expectedStatusProgress = StatusProgress.IN_PROGRESS;
-            System.out.println("\nПроверяем что статус IN_PROGRESS, когда статус Subtasks NEW, IN_PROGRESS, DONE");
-            baseSubtask2.setStatusProgress(StatusProgress.IN_PROGRESS);
-            baseSubtask3.setStatusProgress(StatusProgress.DONE);
-            taskManager.updateSubtask(baseSubtask2);
-            taskManager.updateSubtask(baseSubtask3);
-            Subtask testSubtaskEpic2 = new Subtask("subtaskEpic2", DESCRIPTION, StatusProgress.NEW, BASE_EPIC_2_ID);
-            taskManager.addSubtask(testSubtaskEpic2);
-            //When
-            System.out.println(taskManager.getAllEpics());
-            System.out.println(taskManager.getAllSubtasks());
-            StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_2_ID).getStatusProgress();
-            //Then
-            assertEquals(expectedStatusProgress, actualStatusProgress);
-        }
-
-        @Test
-        @DisplayName("Проверяем что статус Epic IN_PROGRESS, когда статус Subtasks IN_PROGRESS and DONE")
-        void epic_Check_Status_Progress_When_Subtasks_INPROGRESS_DONE_Test(){
-            //Given
-            StatusProgress expectedStatusProgress = StatusProgress.IN_PROGRESS;
-            System.out.println("\nПроверяем что статус IN_PROGRESS, когда статус Subtasks IN_PROGRESS and DONE");
-            baseSubtask2.setStatusProgress(StatusProgress.IN_PROGRESS);
-            baseSubtask3.setStatusProgress(StatusProgress.DONE);
-            taskManager.updateSubtask(baseSubtask2);
-            taskManager.updateSubtask(baseSubtask3);
-            //When
-            System.out.println(taskManager.getAllEpics());
-            System.out.println(taskManager.getAllSubtasks());
-            StatusProgress actualStatusProgress = taskManager.getEpicByIdNumber(BASE_EPIC_2_ID).getStatusProgress();
-            //Then
-            assertEquals(expectedStatusProgress, actualStatusProgress);
         }
 
         @Test
         @DisplayName("Проверяем удаление существующего Epic по ID")
         void removeEpicForIdNumber_Test() {
             //Given
-            System.out.println("\nEpic/Subtasks BEFORE test 'Проверяем удаление существующего Epic по ID':");
-            System.out.println(taskManager.getAllEpics());
-            System.out.println(taskManager.getAllSubtasks());
             //When
             taskManager.removeEpicByIdNumber(BASE_EPIC_WITHOUT_SUBTASK_ID);
             //Then
-            System.out.println("\nEpic/Subtasks AFTER test 'Проверяем удаление существующего Epic по ID':");
-            System.out.println(taskManager.getAllEpics());
-            System.out.println(taskManager.getAllSubtasks());
-            assertThrows(RuntimeException.class, () -> taskManager.getEpicByIdNumber(BASE_EPIC_WITHOUT_SUBTASK_ID));
+            assertThrows(NotFoundException.class, () -> taskManager.getEpicByIdNumber(BASE_EPIC_WITHOUT_SUBTASK_ID));
         }
 
         @Test
@@ -467,13 +354,9 @@ class TaskManagerTest {
             String oldName = "testEpic";
             Epic testEpic = new Epic(oldName, DESCRIPTION);
             taskManager.addEpic(testEpic);
-            System.out.println("\nEpic BEFORE test 'Проверяем обновление Epic Name в Менеджере':");
-            System.out.println(taskManager.getAllEpics());
             //When
             taskManager.updateEpicName(testEpic.getIdNumber(), expectedName);
             String actualName = taskManager.getEpicByIdNumber(testEpic.getIdNumber()).getName().get();
-            System.out.println("\nEpic AFTER test 'Проверяем обновление Epic Name в Менеджере':");
-            System.out.println(taskManager.getAllEpics());
             //Then
             assertEquals(expectedName, actualName);
         }
@@ -486,13 +369,9 @@ class TaskManagerTest {
             String oldDescription = DESCRIPTION;
             Epic testEpic = new Epic("testEpic", oldDescription);
             taskManager.addEpic(testEpic);
-            System.out.println("\nEpic BEFORE test 'Проверяем обновление Epic Description в Менеджере':");
-            System.out.println(taskManager.getAllEpics());
             //When
             taskManager.updateEpicDescription(testEpic.getIdNumber(), expectedDescription);
             String actualDescription = taskManager.getEpicByIdNumber(testEpic.getIdNumber()).getDescription().get();
-            System.out.println("\nEpic AFTER test 'Проверяем обновление Epic Description в Менеджере':");
-            System.out.println(taskManager.getAllEpics());
             //Then
             assertEquals(expectedDescription, actualDescription);
         }
@@ -505,15 +384,9 @@ class TaskManagerTest {
             String newName = "testEpicNEW";
             Epic testEpicNameImmutability = new Epic(expectedName, DESCRIPTION);
             taskManager.addEpic(testEpicNameImmutability);
-            System.out.println("\nEpic BEFORE test 'Проверяем, что Epic Name не меняется в Менеджере без вызова метода" +
-                    " 'updateEpicName'':");
-            System.out.println(taskManager.getAllEpics());
             //When
             testEpicNameImmutability.setName(newName);
             String actualName = taskManager.getEpicByIdNumber(testEpicNameImmutability.getIdNumber()).getName().get();
-            System.out.println("\nEpic AFTER test 'Проверяем, что Epic Name не меняется в Менеджере без вызова метода" +
-                    " 'updateEpicName'':");
-            System.out.println(taskManager.getAllEpics());
             //Then
             assertEquals(expectedName, actualName);
         }
@@ -526,18 +399,152 @@ class TaskManagerTest {
             String newDescription = "NEW Description";
             Epic testEpicDescriptionImmutability = new Epic("testEpicDescriptionImmutability", expectedDescription);
             taskManager.addEpic(testEpicDescriptionImmutability);
-            System.out.println("\nEpic BEFORE test 'Проверяем, что Epic Description не меняется в Менеджере без вызова " +
-                    "метода 'updateEpicDescription':");
-            System.out.println(taskManager.getAllEpics());
             //When
             testEpicDescriptionImmutability.setDescription(newDescription);
             String actualDescription = taskManager.getEpicByIdNumber(testEpicDescriptionImmutability.getIdNumber())
                     .getDescription().get();
-            System.out.println("\nEpic AFTER test 'Проверяем, что Epic Description не меняется в Менеджере без вызова " +
-                    "метода 'updateEpicDescription':");
-            System.out.println(taskManager.getAllEpics());
             //Then
             assertEquals(expectedDescription, actualDescription);
+        }
+
+        @Test
+        @DisplayName("Проверяем, что у пустого Epic duration=0, start/end пустые")
+        void epic_EmptyEpic_HasZeroDurationAndNoStartEnd_Test() {
+            //Given, When
+            Epic emptyEpic = taskManager.getEpicByIdNumber(BASE_EPIC_WITHOUT_SUBTASK_ID);
+            //Then
+            assertEquals(0L, emptyEpic.getDurationInMinutes());
+            assertTrue(emptyEpic.getStartDateTime().isEmpty());
+            assertTrue(emptyEpic.getEndDateTime().isEmpty());
+        }
+
+        @Test
+        @DisplayName("Проверяем, что duration Epic равен сумме duration подзадач")
+        void epic_Duration_IsSumOfSubtasks_Test() {
+            //Given
+            LocalDateTime base = LocalDateTime.of(2026, 1, 1, 10, 0);
+            Epic epic = new Epic("epic-duration", DESCRIPTION);
+            taskManager.addEpic(epic);
+            Subtask subtask1 = new Subtask("s1", DESCRIPTION, StatusProgress.NEW,
+                    epic.getIdNumber(), 30, base);
+            Subtask subtask2 = new Subtask("s2", DESCRIPTION, StatusProgress.NEW,
+                    epic.getIdNumber(), 20, base.plusHours(1));
+            //When
+            taskManager.addSubtask(subtask1);
+            taskManager.addSubtask(subtask2);
+            Epic fromManager = taskManager.getEpicByIdNumber(epic.getIdNumber());
+            //Then
+            assertEquals(50L, fromManager.getDurationInMinutes());
+        }
+
+        @Test
+        @DisplayName("Проверяем, что startDateTime Epic равен минимальному startDateTime подзадач")
+        void epic_StartDateTime_IsMinOfSubtasks_Test() {
+            //Given
+            LocalDateTime base = LocalDateTime.of(2026, 1, 1, 10, 0);
+            Epic epic = new Epic("epic-start", DESCRIPTION);
+            taskManager.addEpic(epic);
+            Subtask early = new Subtask("early", DESCRIPTION, StatusProgress.NEW,
+                    epic.getIdNumber(), 10, base);
+            Subtask late = new Subtask("late", DESCRIPTION, StatusProgress.NEW,
+                    epic.getIdNumber(), 10, base.plusHours(2));
+            //When
+            taskManager.addSubtask(late);
+            taskManager.addSubtask(early);
+            Epic fromManager = taskManager.getEpicByIdNumber(epic.getIdNumber());
+            //Then
+            assertEquals(base, fromManager.getStartDateTime().orElse(null));
+        }
+
+        @Test
+        @DisplayName("Проверяем, что endDateTime Epic равен максимальному endDateTime подзадач")
+        void epic_EndDateTime_IsMaxOfSubtasks_Test() {
+            //Given
+            LocalDateTime base = LocalDateTime.of(2026, 1, 1, 10, 0);
+            Epic epic = new Epic("epic-end", DESCRIPTION);
+            taskManager.addEpic(epic);
+            Subtask early = new Subtask("early", DESCRIPTION, StatusProgress.NEW,
+                    epic.getIdNumber(), 30, base);
+            Subtask late = new Subtask("late", DESCRIPTION, StatusProgress.NEW,
+                    epic.getIdNumber(), 20, base.plusHours(2));
+            //When
+            taskManager.addSubtask(early);
+            taskManager.addSubtask(late);
+            Epic fromManager = taskManager.getEpicByIdNumber(epic.getIdNumber());
+            //Then
+            assertEquals(base.plusHours(2).plusMinutes(20),
+                    fromManager.getEndDateTime().orElse(null));
+        }
+
+        @Test
+        @DisplayName("Проверяем пересчёт полей Epic при обновлении Subtask")
+        void epic_Recalculation_OnUpdateSubtask_Test() {
+            //Given
+            LocalDateTime base = LocalDateTime.of(2026, 1, 1, 10, 0);
+            Epic epic = new Epic("epic-upd", DESCRIPTION);
+            taskManager.addEpic(epic);
+            Subtask subtask = new Subtask("s", DESCRIPTION, StatusProgress.NEW,
+                    epic.getIdNumber(), 10, base);
+            taskManager.addSubtask(subtask);
+            //When
+            subtask.setDurationInMinutes(60);
+            subtask.setStartDateTime(base.plusHours(1));
+            taskManager.updateSubtask(subtask);
+            Epic fromManager = taskManager.getEpicByIdNumber(epic.getIdNumber());
+            //Then
+            assertEquals(60L, fromManager.getDurationInMinutes());
+            assertEquals(base.plusHours(1), fromManager.getStartDateTime().orElse(null));
+            assertEquals(base.plusHours(2), fromManager.getEndDateTime().orElse(null));
+        }
+
+        @Test
+        @DisplayName("Проверяем пересчёт полей Epic при удалении Subtask")
+        void epic_Recalculation_OnRemoveSubtask_Test() {
+            //Given
+            LocalDateTime base = LocalDateTime.of(2026, 1, 1, 10, 0);
+            Epic epic = new Epic("epic-rem", DESCRIPTION);
+            taskManager.addEpic(epic);
+            Subtask early = new Subtask("early", DESCRIPTION, StatusProgress.NEW,
+                    epic.getIdNumber(), 30, base);
+            Subtask late = new Subtask("late", DESCRIPTION, StatusProgress.NEW,
+                    epic.getIdNumber(), 20, base.plusHours(2));
+            taskManager.addSubtask(early);
+            taskManager.addSubtask(late);
+            //When
+            taskManager.removeSubtaskByIdNumber(early.getIdNumber());
+            Epic fromManager = taskManager.getEpicByIdNumber(epic.getIdNumber());
+            //Then
+            assertEquals(20L, fromManager.getDurationInMinutes());
+            assertEquals(base.plusHours(2), fromManager.getStartDateTime().orElse(null));
+            assertEquals(base.plusHours(2).plusMinutes(20),
+                    fromManager.getEndDateTime().orElse(null));
+        }
+
+        @Test
+        @DisplayName("hashCode двух Epic с одинаковыми полями совпадает")
+        void epic_HashCode_EqualObjects_Test() {
+            //Given
+            Epic e1 = new Epic(BASE_EPIC_1_ID, "n", DESCRIPTION);
+            Epic e2 = new Epic(BASE_EPIC_1_ID, "n", DESCRIPTION);
+            //When
+            boolean equalsResult = e1.equals(e2);
+            int hashCode1 = e1.hashCode();
+            int hashCode2 = e2.hashCode();
+            //Then
+            assertTrue(equalsResult, "Объекты должны быть равны");
+            assertEquals(hashCode1, hashCode2, "У равных объектов hashCode должен совпадать");
+        }
+
+        @Test
+        @DisplayName("hashCode Epic стабилен при повторном вызове")
+        void epic_HashCode_IsStable_Test() {
+            //Given
+            Epic epic = new Epic(BASE_EPIC_1_ID, "n", DESCRIPTION);
+            //When
+            int first = epic.hashCode();
+            int second = epic.hashCode();
+            //Then
+            assertEquals(first, second, "hashCode не должен меняться между вызовами");
         }
     }
 
@@ -607,7 +614,7 @@ class TaskManagerTest {
             //Given
             Integer notExistsIdNumber = 666;
             //When, Then
-            assertThrows(RuntimeException.class, () -> taskManager.getSubtaskByIdNumber(notExistsIdNumber));
+            assertThrows(NotFoundException.class, () -> taskManager.getSubtaskByIdNumber(notExistsIdNumber));
         }
 
         @Test
@@ -656,17 +663,41 @@ class TaskManagerTest {
             String newName = "testSubtaskNEW";
             Subtask testSubtaskImmutability = new Subtask(expectedName, DESCRIPTION, StatusProgress.NEW, BASE_EPIC_2_ID);
             taskManager.addSubtask(testSubtaskImmutability);
-            System.out.println("\nSubtasks BEFORE test 'Проверяем, что Subtask не меняется в Менеджере без вызова метода " +
-                    "'updateSubtask'':");
-            System.out.println(taskManager.getAllSubtasks());
             //When
             testSubtaskImmutability.setName(newName);
             String actualName = taskManager.getSubtaskByIdNumber(testSubtaskImmutability.getIdNumber()).getName().get();
-            System.out.println("\nSubtasks AFTER test 'Проверяем, что Subtask не меняется в Менеджере без вызова метода " +
-                    "'updateSubtask'':");
-            System.out.println(taskManager.getAllSubtasks());
             //Then
             assertEquals(expectedName, actualName);
+        }
+
+        @Test
+        @DisplayName("hashCode двух Subtask с одинаковыми полями совпадает")
+        void subtask_HashCode_EqualObjects_Test() {
+            //Given
+            Subtask s1 = new Subtask(BASE_SUBTASK_1_ID, "n", DESCRIPTION, StatusProgress.NEW,
+                    BASE_EPIC_1_ID);
+            Subtask s2 = new Subtask(BASE_SUBTASK_1_ID, "n", DESCRIPTION, StatusProgress.NEW,
+                    BASE_EPIC_1_ID);
+            //When
+            boolean equalsResult = s1.equals(s2);
+            int hashCode1 = s1.hashCode();
+            int hashCode2 = s2.hashCode();
+            //Then
+            assertTrue(equalsResult, "Объекты должны быть равны");
+            assertEquals(hashCode1, hashCode2, "У равных объектов hashCode должен совпадать");
+        }
+
+        @Test
+        @DisplayName("hashCode Subtask стабилен при повторном вызове")
+        void subtask_HashCode_IsStable_Test() {
+            //Given
+            Subtask subtask = new Subtask(BASE_SUBTASK_1_ID, "n", DESCRIPTION, StatusProgress.NEW,
+                    BASE_EPIC_1_ID);
+            //When
+            int first = subtask.hashCode();
+            int second = subtask.hashCode();
+            //Then
+            assertEquals(first, second, "hashCode не должен меняться между вызовами");
         }
     }
 
@@ -700,54 +731,99 @@ class TaskManagerTest {
     void getPrioritizedTasks_Test() {
         //Given
         ArrayList<AbstractTask> expectedList = new ArrayList<>();
+        LocalDateTime base = LocalDateTime.of(2026, 1, 1, 10, 0);
         baseTask1.setDurationInMinutes(10);
-        baseTask1.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(3));
+        baseTask1.setStartDateTime(base.plusHours(3));
         baseSubtask2.setDurationInMinutes(10);
-        baseSubtask2.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(2));
+        baseSubtask2.setStartDateTime(base.plusHours(2));
         baseSubtask3.setDurationInMinutes(10);
-        baseSubtask3.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(1));
+        baseSubtask3.setStartDateTime(base.plusHours(1));
         expectedList.add(baseSubtask3);
         expectedList.add(baseSubtask2);
         expectedList.add(baseTask1);
-
-        System.out.println("\nПроверяем получение списка приоритетных задач");
-        System.out.println("taskManager.updateTask(baseTask1):" + taskManager.updateTask(baseTask1));
-        System.out.println("taskManager.updateSubtask(baseSubtask2):" + taskManager.updateSubtask(baseSubtask2));
-        System.out.println("taskManager.updateSubtask(baseSubtask3):" + taskManager.updateSubtask(baseSubtask3));
+        taskManager.updateTask(baseTask1);
+        taskManager.updateSubtask(baseSubtask2);
+        taskManager.updateSubtask(baseSubtask3);
         //When
         ArrayList<AbstractTask> actualList = taskManager.getPrioritizedTasks();
-        System.out.println(actualList);
         //Then
         assertEquals(expectedList, actualList);
     }
 
+    static Stream<Arguments> intersectCases() {
+        LocalDateTime base = LocalDateTime.of(2026, 1, 1, 10, 0);
+        return Stream.of(
+                Arguments.of("полное совпадение",
+                        base, 60L, base, 60L, true),
+                Arguments.of("t1 внутри t2",
+                        base.plusMinutes(15), 15L, base, 60L, true),
+                Arguments.of("t2 внутри t1",
+                        base, 60L, base.plusMinutes(15), 15L, true),
+                Arguments.of("пересечение в начале",
+                        base, 30L, base.plusMinutes(15), 45L, true),
+                Arguments.of("пересечение в конце",
+                        base.plusMinutes(30), 30L, base, 45L, true),
+                Arguments.of("касание: t1.end == t2.start",
+                        base, 30L, base.plusMinutes(30), 30L, true),
+                Arguments.of("касание: t2.end == t1.start",
+                        base.plusMinutes(30), 30L, base, 30L, true),
+                Arguments.of("t1 полностью до t2",
+                        base, 30L, base.plusHours(1), 30L, false),
+                Arguments.of("t2 полностью до t1",
+                        base.plusHours(1), 30L, base, 30L, false),
+                Arguments.of("зазор 1 минута",
+                        base, 59L, base.plusHours(1), 30L, false)
+        );
+    }
+
+    @ParameterizedTest(name = "[{index}] {0} -> {5}")
+    @MethodSource("intersectCases")
+    @DisplayName("isTimeIntersectBoth возвращает ожидаемый результат для разных интервалов")
+    void isTimeIntersectBoth_Cases_Test(String description,
+                                        LocalDateTime start1, long duration1,
+                                        LocalDateTime start2, long duration2,
+                                        boolean expected) {
+        //Given
+        Task t1 = new Task("t1", "d", StatusProgress.NEW, duration1, start1);
+        Task t2 = new Task("t2", "d", StatusProgress.NEW, duration2, start2);
+        //When
+        boolean actual = taskManager.isTimeIntersectBoth(t1, t2);
+        //Then
+        assertEquals(expected, actual, description);
+    }
+
     @Test
-    @DisplayName("Проверяем пересечение двух задач по времени")
-    void isTimeIntersectBoth_Test() {
-        //Given, expected true
-        baseTask1.setDurationInMinutes(10);
-        baseTask1.setStartDateTime(LocalDateTime.now().withNano(0).plusMinutes(55));
-        baseSubtask2.setDurationInMinutes(10);
-        baseSubtask2.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(1));
+    @DisplayName("isTimeIntersectBoth с null или без startDateTime возвращает false")
+    void isTimeIntersectBoth_NullOrNoStart_ReturnsFalse_Test() {
+        //Given
+        LocalDateTime base = LocalDateTime.of(2026, 1, 1, 10, 0);
+        Task withTime = new Task("t", "d", StatusProgress.NEW, 60, base);
+        Task withoutTime = new Task("t", "d", StatusProgress.NEW);
         //When, Then
-        assertTrue(taskManager.isTimeIntersectBoth(baseTask1, baseSubtask2));
+        assertAll(
+                () -> assertFalse(taskManager.isTimeIntersectBoth(null, withTime)),
+                () -> assertFalse(taskManager.isTimeIntersectBoth(withTime, null)),
+                () -> assertFalse(taskManager.isTimeIntersectBoth(withoutTime, withTime)),
+                () -> assertFalse(taskManager.isTimeIntersectBoth(withTime, withoutTime))
+        );
     }
 
     @Test
     @DisplayName("Проверяем пересечение задачи по времени с приоритетными задачами")
     void isTimeIntersectWithOthers_Test() {
         //Given, expected true
+        LocalDateTime base = LocalDateTime.of(2026, 1, 1, 10, 0);
         baseTask1.setDurationInMinutes(10);
-        baseTask1.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(3));
+        baseTask1.setStartDateTime(base.plusHours(3));
         baseSubtask2.setDurationInMinutes(10);
-        baseSubtask2.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(2));
+        baseSubtask2.setStartDateTime(base.plusHours(2));
         baseSubtask3.setDurationInMinutes(10);
-        baseSubtask3.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(1));
+        baseSubtask3.setStartDateTime(base.plusHours(1));
         taskManager.updateTask(baseTask1);
         taskManager.updateSubtask(baseSubtask2);
         taskManager.updateSubtask(baseSubtask3);
         baseTask2.setDurationInMinutes(10);
-        baseTask2.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(1).plusMinutes(5));
+        baseTask2.setStartDateTime(base.plusHours(1).plusMinutes(5));
         //When, Then
         assertTrue(taskManager.isTimeIntersectWithOthers(baseTask2));
     }
@@ -756,21 +832,26 @@ class TaskManagerTest {
     @DisplayName("Проверяем замену задачи (с новым временем) в приоритетных задачах")
     void check_Replace_Task_In_Prioritized_With_New_Time_Test() {
         //Given
+        LocalDateTime base = LocalDateTime.of(2026, 1, 1, 10, 0);
+        LocalDateTime oldStart = base.plusHours(2);
+        LocalDateTime newStart = base.plusHours(2).plusMinutes(5);
         baseTask1.setDurationInMinutes(10);
-        baseTask1.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(1));
+        baseTask1.setStartDateTime(base.plusHours(1));
         baseTask2.setDurationInMinutes(10);
-        baseTask2.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(2));
+        baseTask2.setStartDateTime(oldStart);
         taskManager.updateTask(baseTask1);
         taskManager.updateTask(baseTask2);
-        System.out.println("\nПроверяем замену задачи (с новым временем) в приоритетных задачах");
-        System.out.println("before" + taskManager.getPrioritizedTasks());
         //When
-        baseTask2.setStartDateTime(LocalDateTime.now().withNano(0).plusHours(2).plusMinutes(5));
-        System.out.println("taskManager.updateTask(baseTask2):" + taskManager.updateTask(baseTask2));
-        Task newBaseTask2 = taskManager.getTaskByIdNumber(BASE_TASK_2_ID);
-        System.out.println("after" + taskManager.getPrioritizedTasks());
+        baseTask2.setStartDateTime(newStart);
+        taskManager.updateTask(baseTask2);
         //Then
-        assertTrue(taskManager.getPrioritizedTasks().contains(newBaseTask2));
+        ArrayList<AbstractTask> prioritized = taskManager.getPrioritizedTasks();
+        AbstractTask actual = prioritized.stream()
+                .filter(task -> task.getIdNumber() == BASE_TASK_2_ID)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Задача с id=" + BASE_TASK_2_ID + " не найдена в prioritizedTasks"));
+        assertEquals(newStart, actual.getStartDateTime().orElse(null),
+                "Задача должна быть с обновлённым startDateTime");
     }
 
 }
